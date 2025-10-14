@@ -98,7 +98,6 @@ export function Signup({
       }
 
       const result = await response.json();
-      console.log("Signup success:", result);
 
       if (result.status === "created" || result.status === "existing_user") {
         onSignupComplete(result.user);
@@ -294,7 +293,6 @@ export function Signup({
                 >
                   <option value="ETH">ETH - Ethereum</option>
                   <option value="BTC">BTC - Bitcoin</option>
-                  <option value="USDC">USDC - USD Coin</option>
                   <option value="USDT">USDT - Tether</option>
                   <option value="SOL">SOL - Solana</option>
                 </select>

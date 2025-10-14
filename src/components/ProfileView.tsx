@@ -2,13 +2,16 @@ import { useState, useEffect, useRef } from "react";
 import { Upload, DollarSign } from "lucide-react";
 import { ProfileData } from "../types";
 import { useToast } from "../context/ToastContext";
+import { useNavigate } from "react-router-dom";
 import Cropper from "react-easy-crop";
+
 import { Dialog } from "@headlessui/react";
 
 import { useNotifications } from "../context/NotificationContext";
 
 interface ProfileViewProps {
   walletAddress: string;
+  onWalletChange?: (wallet: string) => void;
 }
 
 function getCroppedImg(imageSrc: string, pixelCrop: any): Promise<string> {
@@ -38,7 +41,10 @@ function getCroppedImg(imageSrc: string, pixelCrop: any): Promise<string> {
   });
 }
 
-export function ProfileView({ walletAddress }: ProfileViewProps) {
+export function ProfileView({
+  walletAddress,
+  onWalletChange,
+}: ProfileViewProps) {
   const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [crop, setCrop] = useState({ x: 0, y: 0 });
@@ -53,6 +59,8 @@ export function ProfileView({ walletAddress }: ProfileViewProps) {
     null
   );
   const originalWalletRef = useRef<string | null>(walletAddress || null);
+  const [copied, setCopied] = useState(false);
+  // don't rely on Router context — navigate via window to support non-routed render
 
   const [profile, setProfile] = useState<ProfileData>({
     username: "",
@@ -61,10 +69,25 @@ export function ProfileView({ walletAddress }: ProfileViewProps) {
     hourlyRate: "",
     bio: "",
     profilePicture: "",
+    bookingLink: "",
   });
+  const navigate = useNavigate();
+
   const [walletConnected, setWalletConnected] = useState<boolean>(
     !!walletAddress
   );
+
+  const handleCopyLink = () => {
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleVisit = () => {
+    const address = profile.walletAddress || walletAddress || "";
+    const url = `/book/${address}`;
+    console.log("Navigating to", url);
+    navigate(url); // ✅ performs client-side navigation
+  };
 
   // listen for account changes from the injected provider (MetaMask)
   useEffect(() => {
@@ -77,11 +100,14 @@ export function ProfileView({ walletAddress }: ProfileViewProps) {
         handleChange("walletAddress", acc);
         setWalletConnected(true);
         showToast("Wallet account changed", "info");
+        // inform parent that wallet changed so App can persist it
+        if (onWalletChange) onWalletChange(acc);
       } else {
         // no accounts -> disconnected
         handleChange("walletAddress", "");
         setWalletConnected(false);
         showToast("Wallet disconnected", "info");
+        if (onWalletChange) onWalletChange("");
       }
     };
 
@@ -110,17 +136,24 @@ export function ProfileView({ walletAddress }: ProfileViewProps) {
         }
 
         const data = await res.json();
+        console.log("Fetched profile data:", data);
 
-        if (data.status === "ok" && data.user) {
-          const user = data.user;
-          setProfile({
-            username: user.fullName || "",
-            email: user.email || "",
-            walletAddress: user.walletAddress || walletAddress,
-            hourlyRate: user.hourlyRate?.toString() || "",
-            bio: user.bio || "",
-            profilePicture: user.profilePhoto || "",
-          });
+        if (data.status === "ok") {
+          // support both shapes: { status: 'ok', user } and { status: 'ok', data: { user, ... } }
+          const user = data.user ?? data.data?.user;
+          if (user) {
+            setProfile({
+              username: user.fullName || "",
+              email: user.email || "",
+              walletAddress: user.walletAddress || walletAddress,
+              hourlyRate: user.hourlyRate?.toString() || "",
+              bio: user.bio || "",
+              profilePicture: user.profilePhoto || "",
+              bookingLink: user.bookingLink || "",
+            });
+          } else {
+            showToast("Invalid response from server", "error");
+          }
         } else {
           showToast("Invalid response from server", "error");
         }
@@ -187,6 +220,8 @@ export function ProfileView({ walletAddress }: ProfileViewProps) {
 
       originalWalletRef.current = u.walletAddress || originalWalletRef.current;
       setPendingProfilePhoto(null);
+      // propagate wallet change up to app state if provided
+      if (u.walletAddress && onWalletChange) onWalletChange(u.walletAddress);
       showToast("Profile updated successfully!", "success");
       addNotification("Profile saved successfully.");
     } catch (err) {
@@ -262,7 +297,6 @@ export function ProfileView({ walletAddress }: ProfileViewProps) {
               </label>
             </div>
           </div>
-
           {/* Cropper dialog */}
           {showCropper && (
             <Dialog
@@ -334,7 +368,6 @@ export function ProfileView({ walletAddress }: ProfileViewProps) {
               </div>
             </Dialog>
           )}
-
           {/* Username */}
           <div>
             <label
@@ -352,8 +385,39 @@ export function ProfileView({ walletAddress }: ProfileViewProps) {
               placeholder="Enter your username"
             />
           </div>
-
-          {/* Email */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+              Your Public Booking URL
+            </label>
+            <div className="flex items-center gap-3">
+              <div className="flex-1 px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-900 text-gray-600 dark:text-gray-400 font-mono text-sm">
+                {`https://slotchain.io/book/${
+                  profile.walletAddress || walletAddress
+                }`}
+              </div>
+              <button
+                onClick={handleVisit}
+                className={`flex items-center gap-1 px-2 py-2 rounded-md text-sm transition-all ${
+                  copied
+                    ? "bg-green-600 text-white"
+                    : "bg-blue-600 hover:bg-blue-700 text-white"
+                }`}
+              >
+                Visit
+                {/* {copied ? (
+                  <>
+                    <Check className="w-4 h-4" />
+                    Copied!
+                  </>
+                ) : (
+                  <>
+                    <Copy className="w-4 h-4" />
+                    Copy
+                  </>
+                )} */}
+              </button>
+            </div>
+          </div>
           <div>
             <label
               htmlFor="email"
@@ -370,7 +434,6 @@ export function ProfileView({ walletAddress }: ProfileViewProps) {
               placeholder="Enter your email"
             />
           </div>
-
           {/* Wallet Address */}
           <div>
             <label
@@ -445,14 +508,13 @@ export function ProfileView({ walletAddress }: ProfileViewProps) {
               </button>
             </div>
           </div>
-
           {/* Hourly Rate */}
           <div>
             <label
               htmlFor="hourlyRate"
               className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2"
             >
-              Hourly Rate (USD)
+              30 Minutes (USDT)
             </label>
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
@@ -470,7 +532,6 @@ export function ProfileView({ walletAddress }: ProfileViewProps) {
               />
             </div>
           </div>
-
           {/* Bio */}
           <div>
             <label

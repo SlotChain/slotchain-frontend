@@ -6,9 +6,14 @@ import { ProfileView } from "../components/ProfileView";
 interface DashboardProps {
   walletAddress: string;
   onLogout: () => void;
+  onWalletChange?: (wallet: string) => void;
 }
 
-export function Dashboard({ walletAddress, onLogout }: DashboardProps) {
+export function Dashboard({
+  walletAddress,
+  onLogout,
+  onWalletChange,
+}: DashboardProps) {
   const [currentView, setCurrentView] = useState<"availability" | "profile">(
     "availability"
   );
@@ -21,9 +26,15 @@ export function Dashboard({ walletAddress, onLogout }: DashboardProps) {
       walletAddress={walletAddress}
     >
       {currentView === "availability" ? (
-        <AvailabilityView walletAddress={walletAddress} />
+        <AvailabilityView
+          walletAddress={walletAddress}
+          onWalletChange={onWalletChange}
+        />
       ) : (
-        <ProfileView walletAddress={walletAddress} />
+        <ProfileView
+          walletAddress={walletAddress}
+          onWalletChange={onWalletChange}
+        />
       )}
     </DashboardLayout>
   );

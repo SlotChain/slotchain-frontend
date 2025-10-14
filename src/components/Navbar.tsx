@@ -43,7 +43,7 @@ export function Navbar({ onLaunchApp }: NavbarProps) {
           onClick={handleLaunchClick}
           className="px-6 py-2.5 bg-gradient-to-r from-cyan-500 to-blue-500 text-white rounded-lg font-medium hover:shadow-lg hover:shadow-cyan-500/30 transition-all"
         >
-          Launch App
+          Register as Creator
         </button>
       </div>
     </nav>

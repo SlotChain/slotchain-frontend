@@ -3,13 +3,18 @@ export interface User {
   fullName: string;
   email: string;
   bio: string;
-  profilePhoto: string | null;
+  profilePhoto: string;
   hourlyRate: string;
   currency: string;
+  bookingLink: string;
 }
+
 export interface TimeSlot {
   start: string;
   end: string;
+  time?: string;
+  available?: boolean;
+  id: string;
 }
 
 export interface DayAvailability {
@@ -34,6 +39,7 @@ export interface ProfileData {
   hourlyRate: string;
   bio: string;
   profilePicture: string;
+  bookingLink: string;
 }
 
 export interface Notification {
@@ -50,4 +56,15 @@ export interface UserData {
     days: WeekAvailability;
   };
   notifications: Notification[];
+}
+
+export interface AvailableDay {
+  date: string;
+  slots: TimeSlot[];
+}
+
+export interface BookingData {
+  user: User;
+  timezone: string;
+  availableDays: AvailableDay[];
 }

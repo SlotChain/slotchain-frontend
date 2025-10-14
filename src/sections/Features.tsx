@@ -19,7 +19,7 @@ const features: Feature[] = [
     icon: Wallet,
     title: "Crypto Payments",
     description:
-      "Accept Bitcoin, Ethereum, USDC, and 50+ cryptocurrencies instantly with zero chargebacks.",
+      "Accept Bitcoin, Ethereum, USDT, and 50+ cryptocurrencies instantly with zero chargebacks.",
   },
   {
     icon: Shield,

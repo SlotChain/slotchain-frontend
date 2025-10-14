@@ -1,76 +1,102 @@
-import { useState } from "react";
+import { Routes, Route, useNavigate } from "react-router-dom";
 import { LandingPage } from "./pages/LandingPage";
 import { Login } from "./pages/Login";
 import { Signup, SignupData } from "./pages/Signup";
 import { Dashboard } from "./pages/Dashboard";
+import { BookingPage } from "./components/BookingPage";
+import Meeting from "./pages/Meeting";
 import { ThemeProvider } from "./context/ThemeContext";
 import { NotificationProvider } from "./context/NotificationContext";
 import { ToastProvider } from "./context/ToastContext";
-
-type Page = "landing" | "login" | "signup" | "dashboard";
+import { useParams } from "react-router-dom";
+import { useState } from "react";
 
 function App() {
-  const [currentPage, setCurrentPage] = useState<Page>("landing");
   const [walletAddress, setWalletAddress] = useState<string>("");
+  const navigate = useNavigate();
 
+  function BookingPageRoute() {
+    const { walletAddress } = useParams<{ walletAddress: string }>();
+    return <BookingPage walletAddress={walletAddress || ""} />;
+  }
+
+  // Handlers
   const handleLogin = (address: string) => {
     setWalletAddress(address);
-    setCurrentPage("dashboard");
+    navigate("/dashboard");
   };
 
   const handleSignupRedirect = (address: string) => {
-    // ✅ Capture wallet address from login
     setWalletAddress(address);
-    setCurrentPage("signup");
+    navigate("/signup");
   };
 
   const handleSignupComplete = (userData: SignupData) => {
     setWalletAddress(userData.walletAddress);
-    setCurrentPage("dashboard");
+    navigate("/dashboard");
   };
 
   const handleLogout = () => {
     console.log("User logged out");
     setWalletAddress("");
-    setCurrentPage("landing");
-  };
-
-  const renderPage = () => {
-    switch (currentPage) {
-      case "landing":
-        return <LandingPage onLaunchApp={() => setCurrentPage("login")} />;
-
-      case "login":
-        return (
-          <Login
-            onLogin={handleLogin}
-            onSignupRedirect={handleSignupRedirect} // ✅ pass handler with wallet
-          />
-        );
-
-      case "signup":
-        return (
-          <Signup
-            onSignupComplete={handleSignupComplete}
-            onBackToLogin={() => setCurrentPage("login")}
-            connectedWallet={walletAddress} // ✅ pass wallet to signup form
-          />
-        );
-
-      case "dashboard":
-        return (
-          <Dashboard walletAddress={walletAddress} onLogout={handleLogout} />
-        );
-
-      default:
-        return <LandingPage onLaunchApp={() => setCurrentPage("login")} />;
-    }
+    navigate("/");
   };
 
   return (
     <ThemeProvider>
       <NotificationProvider>
-        <ToastProvider>{renderPage()}</ToastProvider>
+        <ToastProvider>
+          <Routes>
+            <Route
+              path="/"
+              element={<LandingPage onLaunchApp={() => navigate("/login")} />}
+            />
+            <Route
+              path="/login"
+              element={
+                <Login
+                  onLogin={handleLogin}
+                  onSignupRedirect={handleSignupRedirect}
+                />
+              }
+            />
+            <Route
+              path="/signup"
+              element={
+                <Signup
+                  onSignupComplete={handleSignupComplete}
+                  onBackToLogin={() => navigate("/login")}
+                  connectedWallet={walletAddress}
+                />
+              }
+            />
+            <Route
+              path="/dashboard"
+              element={
+                <Dashboard
+                  walletAddress={walletAddress}
+                  onLogout={handleLogout}
+                  onWalletChange={setWalletAddress}
+                />
+              }
+            />
+            <Route path="/book/:walletAddress" element={<BookingPageRoute />} />
+
+            <Route
+              path="/landingPage"
+              element={<LandingPage onLaunchApp={() => navigate("/login")} />}
+            />
+
+            <Route
+              path="*"
+              element={<LandingPage onLaunchApp={() => navigate("/login")} />}
+            />
+            <Route
+              path="/meeting"
+              element={<Meeting onLeave={() => navigate("/")} />}
+            />
+          </Routes>
+        </ToastProvider>
       </NotificationProvider>
     </ThemeProvider>
   );
