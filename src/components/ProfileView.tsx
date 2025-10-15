@@ -85,8 +85,8 @@ export function ProfileView({
   const handleVisit = () => {
     const address = profile.walletAddress || walletAddress || "";
     const url = `/book/${address}`;
-    console.log("Navigating to", url);
-    navigate(url); // ✅ performs client-side navigation
+    console.log("Opening in new tab:", url);
+    window.open(url, "_blank"); // ✅ opens in a new tab
   };
 
   // listen for account changes from the injected provider (MetaMask)
@@ -391,7 +391,7 @@ export function ProfileView({
             </label>
             <div className="flex items-center gap-3">
               <div className="flex-1 px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-900 text-gray-600 dark:text-gray-400 font-mono text-sm">
-                {`https://slotchain.io/book/${
+                {`http://localhost:5173/book/${
                   profile.walletAddress || walletAddress
                 }`}
               </div>

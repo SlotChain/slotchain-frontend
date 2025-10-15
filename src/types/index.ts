@@ -14,7 +14,9 @@ export interface TimeSlot {
   end: string;
   time?: string;
   available?: boolean;
-  id: string;
+  booked?: boolean;
+  _id: string;
+  walletAddress: string;
 }
 
 export interface DayAvailability {

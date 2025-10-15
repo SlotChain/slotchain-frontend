@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Plus, Trash2, Clock, Globe } from "lucide-react";
+import { Plus, Trash2, Globe } from "lucide-react";
 import { TimeSlot, WeekAvailability } from "../types";
 import { useToast } from "../context/ToastContext";
 import { useNotifications } from "../context/NotificationContext";
@@ -20,7 +20,13 @@ const DAYS = [
   { key: "sunday", label: "Sunday" },
 ] as const;
 
-const DEFAULT_SLOT: TimeSlot = { start: "09:00", end: "17:00", id: "" };
+const DEFAULT_SLOT: TimeSlot = {
+  walletAddress: "",
+  start: "09:00",
+  end: "17:00",
+  _id: "",
+  booked: false,
+};
 
 export function AvailabilityView({
   walletAddress,
@@ -54,7 +60,7 @@ export function AvailabilityView({
   const [dailyRecords, setDailyRecords] = useState<
     {
       date: string;
-      slots: { start: string; end: string }[];
+      slots: { start: string; end: string; id: string }[];
       interval?: number;
     }[]
   >([]);
@@ -68,6 +74,17 @@ export function AvailabilityView({
     saturday: { enabled: false, slots: [] },
     sunday: { enabled: false, slots: [] },
   });
+
+  const defaultAvailability: WeekAvailability = {
+    monday: { enabled: false, slots: [] },
+    tuesday: { enabled: false, slots: [] },
+    wednesday: { enabled: false, slots: [] },
+    thursday: { enabled: false, slots: [] },
+    friday: { enabled: false, slots: [] },
+    saturday: { enabled: false, slots: [] },
+    sunday: { enabled: false, slots: [] },
+  };
+
   /** 🔹 Fetch existing availability */
   const fetchAvailability = async () => {
     if (!wallet) return;
@@ -81,8 +98,67 @@ export function AvailabilityView({
 
       const result = json?.data;
       if (!result) return;
+
+      setTimezone(result.timezone || moment.tz.guess());
+      setInterval(result.interval || 30);
+      setRangeStart(result.range?.start || today);
+      setRangeEnd(
+        result.range?.end || moment().add(30, "days").format("YYYY-MM-DD")
+      );
+      setInfinite(result.range?.infinite || false);
+      setUnavailableRanges(result.unavailableRanges || []);
+      setDailyRecords(result.availableDays || []);
+
+      // Reconstruct weekly availability
+      if (result.availableDays?.length > 0) {
+        const days: (keyof WeekAvailability)[] = [
+          "monday",
+          "tuesday",
+          "wednesday",
+          "thursday",
+          "friday",
+          "saturday",
+          "sunday",
+        ];
+
+        // Start with default empty week
+        const weekAvailability: WeekAvailability = days.reduce((acc, day) => {
+          acc[day] = { enabled: false, slots: [] };
+          return acc;
+        }, {} as WeekAvailability);
+
+        result.availableDays.forEach(
+          (rec: { date: string; slots?: TimeSlot[] }) => {
+            // Assign default slot if undefined or empty
+            const daySlots: TimeSlot[] =
+              rec.slots && rec.slots.length > 0
+                ? rec.slots
+                : [
+                    {
+                      _id: `${rec.date}-default-1`,
+                      start: "09:00",
+                      end: "09:30",
+                      booked: false,
+                      walletAddress: "", // must include this
+                    },
+                  ];
+
+            const weekday = weekdayKeyFromDate(rec.date);
+
+            // Only set if not already enabled (take first occurrence)
+            if (!weekAvailability[weekday].enabled) {
+              weekAvailability[weekday] = { enabled: true, slots: daySlots };
+            }
+          }
+        );
+
+        setAvailability(weekAvailability);
+      } else {
+        setAvailability(defaultAvailability);
+      }
     } catch (err) {
       console.error("fetchAvailability", err);
+      showToast("Error fetching availability", "error");
     }
   };
 
@@ -99,6 +175,34 @@ export function AvailabilityView({
       cur.add(1, "day");
     }
     return result;
+  };
+  const generatePerDateSlots = () => {
+    const finalEnd = infinite
+      ? moment(rangeStart).add(365, "days").format("YYYY-MM-DD")
+      : rangeEnd;
+
+    const allDates = generateDateRange(rangeStart, finalEnd);
+
+    const perDateRecords = allDates
+      .filter((d) => !isDateInUnavailable(d))
+      .map((date) => {
+        const weekday = weekdayKeyFromDate(date);
+        const dayData = availability[weekday];
+
+        if (!dayData.enabled) return { date, slots: [] };
+
+        const slotsToUse =
+          dayData.slots.length > 0 ? dayData.slots : [DEFAULT_SLOT];
+
+        // split slots into intervals
+        const slots = slotsToUse.flatMap((slot) =>
+          splitIntoIntervals(slot.start, slot.end, interval)
+        );
+
+        return { date, slots };
+      });
+
+    return perDateRecords;
   };
 
   const weekdayKeyFromDate = (dateStr: string): keyof WeekAvailability =>
@@ -124,46 +228,8 @@ export function AvailabilityView({
 
     try {
       const INTERVAL = interval;
-      const finalEnd = infinite
-        ? moment(rangeStart).add(365, "days").format("YYYY-MM-DD")
-        : rangeEnd;
+      const availableDays = generatePerDateSlots(); // ✅ generate per-date slots
 
-      const allDates = generateDateRange(rangeStart, finalEnd);
-
-      // 🔹 Build structured availability for all weekdays in each date
-      const availableDays = allDates
-        .filter((d) => !isDateInUnavailable(d))
-        .map((d) => {
-          const dayAvailability: Record<
-            keyof WeekAvailability,
-            { start: string; end: string }[]
-          > = {
-            monday: [],
-            tuesday: [],
-            wednesday: [],
-            thursday: [],
-            friday: [],
-            saturday: [],
-            sunday: [],
-          };
-
-          // 🔸 For each weekday, copy its enabled slots pattern
-          (Object.keys(availability) as (keyof WeekAvailability)[]).forEach(
-            (weekdayKey) => {
-              const dayData = availability[weekdayKey];
-              if (dayData.enabled) {
-                const slots = dayData.slots.flatMap((slot) =>
-                  splitIntoIntervals(slot.start, slot.end, INTERVAL)
-                );
-                dayAvailability[weekdayKey] = slots;
-              }
-            }
-          );
-
-          return { date: d, availability: dayAvailability };
-        });
-
-      // 🔹 Final payload
       const payload = {
         timezone,
         interval: INTERVAL,
@@ -173,21 +239,23 @@ export function AvailabilityView({
           infinite,
         },
         unavailableRanges,
-        availableDays, // ✅ full weekly pattern per date
+        availableDays, // ✅ use generated slots
       };
 
-      // 🔹 Save to backend
       const res = await fetch(
-        `http://localhost:5000/api/availability/${wallet}`,
+        `http://localhost:5000/api/availability/save/${wallet}`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
         }
       );
+      console.log("Payload:", JSON.stringify(payload, null, 2));
 
       const response = await res.json();
       if (!res.ok || !response) throw new Error("Failed to save");
+
+      console.log("✅ Saved", response);
 
       await fetchAvailability();
       showToast("Availability saved successfully!", "success");
@@ -313,15 +381,33 @@ export function AvailabilityView({
     }));
 
   /** 🔹 Count preview */
+  /** 🔹 Count preview */
   const previewGeneratedCount = () => {
     const finalEnd = infinite
       ? moment(rangeStart).add(365, "days").format("YYYY-MM-DD")
       : rangeEnd;
+
     const allDates = generateDateRange(rangeStart, finalEnd);
-    return allDates.filter((d) => {
-      const weekdayKey = weekdayKeyFromDate(d);
-      return availability[weekdayKey].enabled && !isDateInUnavailable(d);
-    }).length;
+
+    let count = 0;
+
+    allDates.forEach((date) => {
+      if (isDateInUnavailable(date)) return; // skip unavailable dates
+
+      const weekday = weekdayKeyFromDate(date);
+      const dayData = availability[weekday];
+
+      if (!dayData.enabled || dayData.slots.length === 0) return;
+
+      // Count slots after splitting into intervals
+      const slots = dayData.slots.flatMap((slot) =>
+        splitIntoIntervals(slot.start, slot.end, interval)
+      );
+
+      count += slots.length;
+    });
+
+    return count;
   };
 
   return (
@@ -439,7 +525,7 @@ export function AvailabilityView({
               {unavailableRanges.map((r, i) => (
                 <div
                   key={i}
-                  className="flex items-center justify-between gap-2 bg-gray-50 dark:bg-gray-900/30 p-2 rounded-lg"
+                  className="flex items-center justify-between gap-2 bg-slate-100 dark:bg-slate-100 p-2 rounded-lg"
                 >
                   <div className="text-sm">
                     {r.start} → {r.end}
@@ -522,6 +608,7 @@ export function AvailabilityView({
                             type="time"
                             value={slot.start}
                             onChange={(e) =>
+                              !slot.booked &&
                               updateTimeSlot(
                                 key,
                                 index,
@@ -529,7 +616,12 @@ export function AvailabilityView({
                                 e.target.value
                               )
                             }
-                            className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                            className={`px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all ${
+                              slot.booked
+                                ? "bg-red-500 text-white cursor-not-allowed border-red-600"
+                                : "bg-white dark:bg-gray-700 text-gray-900 dark:text-white border-gray-300 dark:border-gray-600"
+                            }`}
+                            disabled={slot.booked}
                           />
                           <span className="text-gray-500 dark:text-gray-400">
                             to
@@ -538,11 +630,17 @@ export function AvailabilityView({
                             type="time"
                             value={slot.end}
                             onChange={(e) =>
+                              !slot.booked &&
                               updateTimeSlot(key, index, "end", e.target.value)
                             }
-                            className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+                            className={`px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all ${
+                              slot.booked
+                                ? "bg-red-500 text-white cursor-not-allowed border-red-600"
+                                : "bg-white dark:bg-gray-700 text-gray-900 dark:text-white border-gray-300 dark:border-gray-600"
+                            }`}
+                            disabled={slot.booked}
                           />
-                          {dayData.slots.length > 1 && (
+                          {dayData.slots.length > 1 && !slot.booked && (
                             <button
                               onClick={() => removeTimeSlot(key, index)}
                               className="p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors"
@@ -594,37 +692,46 @@ export function AvailabilityView({
       {/* Saved per-date records from backend */}
       <div className="mt-6">
         <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-3">
-          Saved Daily Slots
+          Saved Available Dates
         </h3>
+
         {dailyRecords.length === 0 ? (
           <p className="text-sm text-gray-600 dark:text-gray-400">
-            No per-date records saved yet.
+            No available days found.
           </p>
         ) : (
-          <div className="space-y-3">
-            {dailyRecords.map((rec) => (
-              <div
-                key={rec.date}
-                className="p-3 bg-white dark:bg-gray-800 border rounded-lg"
-              >
-                <div className="flex items-center justify-between">
-                  <div className="font-medium">{rec.date}</div>
-                  <div className="text-sm text-gray-500">
-                    {rec.interval ? `${rec.interval}m slots` : "slots"}
-                  </div>
-                </div>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  {rec.slots.map((s, i) => (
+          <div className="space-y-2">
+            {(() => {
+              // Only take first 3 and last 3 dates if too many
+              const visibleDays =
+                dailyRecords.length > 6
+                  ? [...dailyRecords.slice(0, 3), ...dailyRecords.slice(-3)]
+                  : dailyRecords;
+
+              return (
+                <>
+                  {visibleDays.map((rec) => (
                     <div
-                      key={i}
-                      className="px-3 py-1.5 bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded-lg text-sm"
+                      key={rec.date}
+                      className="p-3 bg-white dark:bg-gray-800 border rounded-lg text-gray-900 dark:text-gray-100 flex justify-between"
                     >
-                      {s.start} - {s.end}
+                      <span>{rec.date}</span>
+                      <span className="text-sm text-gray-500 dark:text-gray-400">
+                        {rec.slots?.length ?? 0} slot
+                        {rec.slots?.length === 1 ? "" : "s"}
+                      </span>
                     </div>
                   ))}
-                </div>
-              </div>
-            ))}
+
+                  {dailyRecords.length > 6 && (
+                    <p className="text-gray-400 text-sm italic">
+                      Showing first 3 and last 3 dates out of{" "}
+                      {dailyRecords.length} total.
+                    </p>
+                  )}
+                </>
+              );
+            })()}
           </div>
         )}
       </div>
