@@ -1,16 +1,13 @@
 import { useState } from "react";
-import { X, Wallet, Check, Loader2 } from "lucide-react";
+import { Check, Loader2 } from "lucide-react";
 import { TimeSlot } from "../types";
-import { SlotChainABI } from "../../contractABI/SlotChainABI.json";
-
-import {
-  useAccount,
-  useConnect,
-  useWriteContract,
-  useWaitForTransaction,
-} from "wagmi";
+import SlotChainABI from "../../contractABI/SlotChainABI.json";
+import { waitForTransactionReceipt } from "@wagmi/core";
+import { useConnect, useWriteContract } from "wagmi";
 import { metaMask } from "wagmi/connectors";
-import { parseEther } from "viem";
+import erc20ABI from "../../contractABI/erc20ABI.json";
+import { useToast } from "../context/ToastContext";
+import { config } from "../config";
 
 interface BookingModalProps {
   isOpen: boolean;
@@ -19,7 +16,7 @@ interface BookingModalProps {
   date: string;
   userName: string;
   hourlyRate: string;
-  walletAddress: string;
+  creatorAddress: string;
   onBookingComplete: () => void;
 }
 
@@ -30,7 +27,7 @@ export default function BookingModal({
   date,
   userName,
   hourlyRate,
-  walletAddress,
+  creatorAddress,
   onBookingComplete,
 }: BookingModalProps) {
   const [isConnected, setIsConnected] = useState(false);
@@ -38,65 +35,85 @@ export default function BookingModal({
   const [isSuccess, setIsSuccess] = useState(false);
   const { connectAsync } = useConnect();
   const { writeContractAsync } = useWriteContract();
-  const { waitForTransaction } = useWaitForTransaction();
+
+  const { showToast } = useToast();
 
   if (!isOpen || !slot) return null;
-
-  const handleConnectWallet = async () => {
-    try {
-      setIsProcessing(true);
-
-      // Connect with MetaMask (wagmi v2 style)
-      const result = await connectAsync({ connector: metaMask() });
-      console.log("Connected account:", result.accounts[0]);
-    } catch (error) {
-      console.error("Error connecting wallet:", error);
-      alert("Failed to connect wallet. Please try again.");
-    } finally {
-      setIsProcessing(false);
-    }
-  };
 
   const handlePayAndBook = async () => {
     if (!slot) return;
     setIsProcessing(true);
 
     console.log("Starting booking process for slot:", slot);
-    console.log("Wallet address:", walletAddress);
+    console.log("creatorAddress:", creatorAddress);
     console.log("Date:", date);
 
     try {
-      // 1️⃣ Connect wallet if not connected
+      // 1️⃣ Ensure wallet is connected
+      let userAddress;
       if (!isConnected) {
         const result = await connectAsync({ connector: metaMask() });
-        console.log("Connected account:", result.accounts[0]);
+        userAddress = result.accounts[0];
+        console.log("User Address:", userAddress);
       }
 
-      // 2️⃣ Send payment transaction to contract
+      // 2️⃣ Prepare values
+      const slotStart = Math.floor(
+        new Date(`${date}T${slot.start}:00Z`).getTime() / 1000
+      );
+      const slotEnd = Math.floor(
+        new Date(`${date}T${slot.end}:00Z`).getTime() / 1000
+      );
+      const scaledHourlyRate = BigInt(
+        Math.floor(Number(hourlyRate) * 1_000_000)
+      ); // USDT is 6 decimals
+
+      console.log("SlotStart", slotStart);
+      console.log("slot end", slotEnd);
+      const tokenAddress = import.meta.env
+        .VITE_USDT_TOKEN_ADDRESS as `0x${string}`;
+      const contractAddress = import.meta.env
+        .VITE_SLOCTCHAIN_CONTRACT as `0x${string}`;
+
+      const approveTx = await writeContractAsync({
+        address: tokenAddress,
+        abi: erc20ABI,
+        functionName: "approve",
+        args: [contractAddress, scaledHourlyRate],
+        chainId: 11155111, // Sepolia
+        gas: 1_000_000n,
+      });
+
+      console.log("Approval transaction sent:", approveTx);
+      await waitForTransactionReceipt(config, { hash: approveTx });
+      console.log("✅ Approval confirmed!");
+
+      // 4️⃣ Call bookSlot on contract
+      console.log("Booking slot via contract...");
       const tx = await writeContractAsync({
-        address: contractAddress as `0x${string}`,
+        address: contractAddress,
         abi: SlotChainABI,
-        functionName: "bookSlot", // adjust to your contract’s method
-        args: [slot._id, date], // adjust params to match your contract
-        value: parseEther(hourlyRate.toString()), // if it's a payable function
+        functionName: "bookSlot",
+        args: [creatorAddress, BigInt(slotStart), BigInt(slotEnd)],
+        chainId: 11155111,
+        gas: 1_000_000n,
       });
 
       console.log("Transaction sent:", tx);
+      await waitForTransactionReceipt(config, { hash: tx });
+      console.log("✅ Booking confirmed on-chain");
 
-      // 3️⃣ Wait for transaction confirmation (optional but recommended)
-      const receipt = await waitForTransaction({ hash: tx.hash });
-      console.log("Transaction confirmed:", receipt);
+      // 5️⃣ Sync with backend
 
-      // 4️⃣ Call backend API to store booking in DB
       const res = await fetch(
         "http://localhost:5000/api/availability/bookSlot",
         {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            walletAddress: address, // from wagmi
+            creatorAddress: creatorAddress,
             date,
-            slotId: slot._id, // make sure to use _id
+            slotId: slot._id,
           }),
         }
       );
@@ -108,24 +125,25 @@ export default function BookingModal({
       }
 
       const data = await res.json();
-      console.log("Parsed response data:", data);
+      console.log("Backend booking response:", data);
 
       if (!data.success) {
         throw new Error(data.message || "Booking failed");
       }
 
-      // 5️⃣ Update UI state
+      // 6️⃣ Update UI
       onBookingComplete();
       setIsProcessing(false);
       setIsSuccess(true);
+      showToast("Slot booked successfully!", "success");
 
       setTimeout(() => {
         handleClose();
       }, 2000);
     } catch (err) {
-      console.error("Booking failed:", err);
+      console.error("❌ Booking failed:", err);
+      showToast("Booking failed", "error");
       setIsProcessing(false);
-      // optionally show a toast error
     }
   };
 
@@ -153,16 +171,16 @@ export default function BookingModal({
         onClick={handleClose}
       />
 
-      <div className="relative bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden animate-in fade-in zoom-in duration-200">
+      <div className="relative bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden">
         <button
           onClick={handleClose}
           className="absolute top-4 right-4 p-2 rounded-lg hover:bg-slate-100 transition-colors"
         >
-          <X className="w-5 h-5 text-slate-900" />
+          ✕
         </button>
 
         {isSuccess ? (
-          <div className="p-8 text-center bg-slate-900 rounded-2xl shadow-sm border border-slate-100">
+          <div className="p-8 text-center bg-slate-900 rounded-2xl">
             <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <Check className="w-8 h-8 text-green-600" />
             </div>
@@ -170,113 +188,62 @@ export default function BookingModal({
               Booking Confirmed!
             </h3>
             <p className="text-slate-100">
-              Your slot has been successfully booked with {userName}
+              Your slot has been successfully booked with {userName}.
             </p>
           </div>
         ) : (
-          <>
-            <div className="bg-gradient-to-r from-slate-900 to-slate-900 px-8 py-6">
-              <h3 className="text-2xl font-bold text-white mb-1">
-                Confirm Booking
-              </h3>
-              <p className="text-slate-100">
+          <div className="p-8 bg-slate-900 rounded-2xl text-white space-y-6">
+            <div>
+              <h3 className="text-2xl font-bold mb-1">Confirm Booking</h3>
+              <p className="text-slate-400">
                 Review details and complete payment
               </p>
             </div>
 
-            <div className="p-8 bg-slate-800">
-              <div className="bg-slate-900 rounded-xl p-6 mb-6 border border-slate-100">
-                <div className="space-y-4">
-                  <div>
-                    <div className="text-sm font-medium text-slate-100 mb-1">
-                      Booking with
-                    </div>
-                    <div className="text-lg font-semibold text-slate-100">
-                      {userName}
-                    </div>
-                  </div>
-                  <div className="border-t border-slate-100 pt-4">
-                    <div className="text-sm font-medium text-slate-100 mb-1">
-                      Date
-                    </div>
-                    <div className="text-base font-medium text-slate-100">
-                      {formatDate(date)}
-                    </div>
-                  </div>
-                  <div className="border-t border-slate-100 pt-4">
-                    <div className="text-sm font-medium text-slate-100 mb-1">
-                      Time
-                    </div>
-                    <div className="text-base font-medium text-slate-100">
-                      {slot.time}
-                    </div>
-                  </div>
-                  <div className="border-t border-slate-100 pt-4">
-                    <div className="text-sm font-medium text-slate-100 mb-1">
-                      Price
-                    </div>
-                    <div className="text-2xl font-bold text-slate-100">
-                      {hourlyRate}
-                    </div>
-                  </div>
-                </div>
+            <div className="bg-slate-800 rounded-xl p-4 border border-slate-700 space-y-3">
+              <div>
+                <p className="text-sm text-slate-400">Booking with</p>
+                <p className="font-medium">{userName}</p>
               </div>
-
-              <div className="space-y-3">
-                {!isConnected ? (
-                  <button
-                    onClick={handleConnectWallet}
-                    disabled={isProcessing}
-                    className="w-full flex items-center justify-center gap-2 bg-slate-900 hover:bg-blue-900 text-white font-semibold py-4 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {isProcessing ? (
-                      <>
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                        Connecting...
-                      </>
-                    ) : (
-                      <>
-                        <Wallet className="w-5 h-5" />
-                        Connect Wallet
-                      </>
-                    )}
-                  </button>
-                ) : (
-                  <button
-                    onClick={handlePayAndBook}
-                    disabled={isProcessing}
-                    className="w-full flex items-center justify-center gap-2 bg-slate-900 hover:bg-blue-900 text-white font-semibold py-4 rounded-xl transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {isProcessing ? (
-                      <>
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                        Processing Payment...
-                      </>
-                    ) : (
-                      <>
-                        <Check className="w-5 h-5" />
-                        Pay & Book
-                      </>
-                    )}
-                  </button>
-                )}
-
-                <button
-                  onClick={handleClose}
-                  className="w-full text-slate-100 hover:text-slate-900 font-medium py-3 transition-colors"
-                >
-                  Cancel
-                </button>
+              <div className="border-t border-slate-700 pt-2">
+                <p className="text-sm text-slate-400">Date</p>
+                <p>{formatDate(date)}</p>
               </div>
-
-              {isConnected && !isProcessing && (
-                <div className="mt-4 flex items-center gap-2 text-sm text-green-600 bg-green-50 rounded-lg px-4 py-3 border border-green-200">
-                  {" "}
-                  <Check className="w-4 h-4" /> Wallet connected successfully{" "}
-                </div>
-              )}
+              <div className="border-t border-slate-700 pt-2">
+                <p className="text-sm text-slate-400">Time</p>
+                <p>{slot.time}</p>
+              </div>
+              <div className="border-t border-slate-700 pt-2">
+                <p className="text-sm text-slate-400">Price</p>
+                <p className="text-xl font-bold">{hourlyRate} ETH</p>
+              </div>
             </div>
-          </>
+
+            <button
+              onClick={handlePayAndBook}
+              disabled={isProcessing}
+              className="w-full flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-4 rounded-xl transition-colors disabled:opacity-50"
+            >
+              {isProcessing ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  Processing Payment...
+                </>
+              ) : (
+                <>
+                  <Check className="w-5 h-5" />
+                  Pay & Book
+                </>
+              )}
+            </button>
+
+            {isConnected && !isProcessing && (
+              <div className="mt-4 flex items-center gap-2 text-sm text-green-600 bg-green-50 rounded-lg px-4 py-3 border border-green-200">
+                {" "}
+                <Check className="w-4 h-4" /> Wallet connected successfully{" "}
+              </div>
+            )}
+          </div>
         )}
       </div>
     </div>

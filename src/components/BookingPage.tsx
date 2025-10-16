@@ -351,7 +351,7 @@ export function BookingPage({ walletAddress }: BookingPageProps) {
         date={currentDay.date}
         userName={userData.user.fullName}
         hourlyRate={userData.user.hourlyRate}
-        walletAddress={walletAddress}
+        creatorAddress={walletAddress}
         onBookingComplete={handleBookingComplete}
       />
     </div>
