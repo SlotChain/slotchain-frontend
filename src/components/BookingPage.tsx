@@ -1,14 +1,14 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect } from 'react';
 import {
   Calendar,
   ChevronLeft,
   ChevronRight,
   Globe,
   Clock,
-} from "lucide-react";
-import moment from "moment-timezone";
-import { TimeSlot, AvailableDay } from "../types";
-import BookingModal from "./BookingModal";
+} from 'lucide-react';
+import moment from 'moment-timezone';
+import { TimeSlot, AvailableDay } from '../types';
+import BookingModal from './BookingModal';
 
 interface BookingPageProps {
   walletAddress: string;
@@ -18,30 +18,50 @@ export function BookingPage({ walletAddress }: BookingPageProps) {
   // fetched state
   const [userData, setUserData] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
-  const [selectedTimezone, setSelectedTimezone] = useState("UTC");
   const [currentDayIndex, setCurrentDayIndex] = useState(0);
   const [selectedSlot, setSelectedSlot] = useState<TimeSlot | null>(null);
+  const [selectedSlotDate, setSelectedSlotDate] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [bookedSlots, setBookedSlots] = useState<Set<string>>(new Set());
 
-  const formatTimeRange = (start: string, end: string) => {
+  const formatSlotLabel = (
+    date: string,
+    start: string,
+    end: string,
+    timezone: string,
+  ) => {
     try {
-      const s = moment(start, "HH:mm").format("h:mm A");
-      const e = moment(end, "HH:mm").format("h:mm A");
-      return `${s} - ${e}`;
+      const safeTz = timezone || 'UTC';
+      const startMoment = moment.tz(
+        `${date} ${start}`,
+        'YYYY-MM-DD HH:mm',
+        safeTz,
+      );
+      const endMoment = moment.tz(`${date} ${end}`, 'YYYY-MM-DD HH:mm', safeTz);
+      return `${startMoment.format('h:mm A')} - ${endMoment.format('h:mm A')}`;
     } catch (err) {
       return `${start} - ${end}`;
     }
   };
+
+  const resolveIpfsUri = (uri?: string | null) => {
+    if (!uri || typeof uri !== 'string') return '';
+    if (uri.startsWith('ipfs://')) {
+      const cid = uri.replace('ipfs://', '');
+      return `https://orange-solid-cattle-398.mypinata.cloud/ipfs/${cid}`;
+    }
+    return uri;
+  };
+
   const fetchData = async () => {
     setLoading(true);
     try {
       const res = await fetch(
-        `http://localhost:5000/api/availability/getAvailability/${walletAddress}`
+        `http://localhost:5000/api/availability/getAvailability/${walletAddress}`,
       );
 
       const userProfile = await fetch(
-        `http://localhost:5000/api/auth/user/${walletAddress}`
+        `http://localhost:5000/api/auth/user/${walletAddress}`,
       );
 
       if (!res.ok || !userProfile.ok)
@@ -52,51 +72,59 @@ export function BookingPage({ walletAddress }: BookingPageProps) {
       const profileJson = await userProfile.json();
       const profile = profileJson?.data?.user;
 
-      if (!data) throw new Error("No data found");
+      if (!data) throw new Error('No data found');
+
+      const timezone = data.timezone || 'UTC';
+      const nowInTimezone = moment.tz(timezone);
 
       // 🧩 Transform API shape → UI shape
-      const normalizedDays = data.availableDays.map((day: any) => {
-        const slots = day.slots.map((t: any) => {
-          const id = `${day.date}-${t.start}`; // UI-friendly ID
+      const normalizedDays = data.availableDays
+        .map((day: any) => {
+          const slots = day.slots
+            .filter((t: any) => {
+              const slotEndMoment = moment.tz(
+                `${day.date} ${t.end}`,
+                'YYYY-MM-DD HH:mm',
+                timezone,
+              );
+              return slotEndMoment.isSameOrAfter(nowInTimezone);
+            })
+            .map((t: any) => {
+              const id = `${day.date}-${t.start}`; // UI-friendly ID
+
+              return {
+                id, // local UI ID
+                _id: t._id, // ✅ preserve MongoDB _id for booking
+                start: t.start,
+                end: t.end,
+                booked: t.booked,
+                time: formatSlotLabel(day.date, t.start, t.end, timezone),
+                available: !t.booked,
+              };
+            });
 
           return {
-            id, // local UI ID
-            _id: t._id, // ✅ preserve MongoDB _id for booking
-            start: t.start,
-            end: t.end,
-            booked: t.booked,
-            time: `${moment(t.start, "HH:mm").format("h:mm A")} - ${moment(
-              t.end,
-              "HH:mm"
-            ).format("h:mm A")}`,
-            available: !t.booked,
+            date: day.date,
+            slots,
           };
-        });
-
-        return {
-          date: day.date,
-          slots,
-        };
-      });
+        })
+        .filter((day: any) => day.slots.length > 0);
 
       const normalizedData = {
         user: {
-          fullName: profile.fullName || "Unknown User",
-          bio: profile.bio || "No bio provided.",
-          profilePhoto:
-            profile.profilePhoto ||
-            "https://ui-avatars.com/api/?name=User&background=0D8ABC&color=fff",
-          hourlyRate: profile.hourlyRate || "$50/hr",
+          fullName: profile.fullName || 'Unknown User',
+          bio: profile.bio || 'No bio provided.',
+          profilePhoto: resolveIpfsUri(profile.profilePhoto),
+          hourlyRate: profile.hourlyRate || '$50/hr',
         },
         availableDays: normalizedDays,
-        timezone: data.timezone || "UTC",
+        timezone,
         duration: data.interval || 60,
       };
 
       setUserData(normalizedData);
-      setSelectedTimezone(normalizedData.timezone);
     } catch (err) {
-      console.error("Failed to fetch booking data", err);
+      console.error('Failed to fetch booking data', err);
       setUserData(null);
     } finally {
       setLoading(false);
@@ -108,6 +136,17 @@ export function BookingPage({ walletAddress }: BookingPageProps) {
 
     fetchData();
   }, [walletAddress]);
+
+  useEffect(() => {
+    if (!userData?.availableDays?.length) {
+      setCurrentDayIndex(0);
+      return;
+    }
+
+    setCurrentDayIndex((prev) =>
+      Math.min(prev, userData.availableDays.length - 1),
+    );
+  }, [userData?.availableDays?.length]);
 
   if (loading) {
     return (
@@ -164,9 +203,9 @@ export function BookingPage({ walletAddress }: BookingPageProps) {
   };
 
   const handleSlotClick = (slot: TimeSlot) => {
-    if (slot.available && !bookedSlots.has(slot._id)) {
-      console.log("Slot", slot);
+    if ((slot.available ?? !slot.booked) && !bookedSlots.has(slot._id)) {
       setSelectedSlot(slot);
+      setSelectedSlotDate(currentDay.date);
       setIsModalOpen(true);
     }
   };
@@ -177,6 +216,12 @@ export function BookingPage({ walletAddress }: BookingPageProps) {
   };
 
   const isSlotBooked = (slotId: string) => bookedSlots.has(slotId);
+
+  const handleModalClose = () => {
+    setIsModalOpen(false);
+    setSelectedSlot(null);
+    setSelectedSlotDate(null);
+  };
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 transition-colors flex flex-col">
@@ -253,10 +298,13 @@ export function BookingPage({ walletAddress }: BookingPageProps) {
                   </label>
                   <input
                     type="text"
-                    value={selectedTimezone}
                     readOnly
+                    value={userData.timezone || 'UTC'}
                     className="w-full px-4 py-3 bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-500 focus:border-transparent transition-all cursor-not-allowed text-center"
                   />
+                  <p className="mt-2 text-xs text-slate-100">
+                    Times shown exactly match the creator&rsquo;s availability.
+                  </p>
                 </div>
 
                 <div className="mb-6">
@@ -290,7 +338,8 @@ export function BookingPage({ walletAddress }: BookingPageProps) {
                 <div className="space-y-3">
                   {currentDay?.slots?.map((slot: TimeSlot) => {
                     const isBooked = isSlotBooked(slot._id);
-                    const isAvailable = slot.available && !isBooked;
+                    const isAvailable =
+                      (slot.available ?? !slot.booked) && !isBooked;
 
                     return (
                       <button
@@ -299,15 +348,23 @@ export function BookingPage({ walletAddress }: BookingPageProps) {
                         disabled={!isAvailable}
                         className={`w-full px-6 py-4 rounded-xl font-medium transition-all ${
                           isAvailable
-                            ? "bg-slate-800 hover:bg-blue-900 text-slate-100 border-2 border-slate-200 hover:border-slate-300 hover:shadow-md cursor-pointer"
-                            : "bg-red-500 text-white border-2 border-red-700 cursor-not-allowed"
+                            ? 'bg-slate-800 hover:bg-blue-900 text-slate-100 border-2 border-slate-200 hover:border-slate-300 hover:shadow-md cursor-pointer'
+                            : 'bg-red-500 text-white border-2 border-red-700 cursor-not-allowed'
                         }`}
                       >
                         <div className="flex items-center justify-between">
-                          <span>{slot.time}</span>
+                          <span>
+                            {slot.time ??
+                              formatSlotLabel(
+                                currentDay.date,
+                                slot.start,
+                                slot.end,
+                                userData.timezone || 'UTC',
+                              )}
+                          </span>
                           {!isAvailable && (
                             <span className="text-sm">
-                              {isBooked ? "Booked" : "Unavailable"}
+                              {isBooked ? 'Booked' : 'Unavailable'}
                             </span>
                           )}
                         </div>
@@ -317,7 +374,8 @@ export function BookingPage({ walletAddress }: BookingPageProps) {
 
                   {currentDay.slots.every(
                     (slot: TimeSlot) =>
-                      !slot.available || isSlotBooked(slot._id)
+                      !(slot.available ?? !slot.booked) ||
+                      isSlotBooked(slot._id),
                   ) && (
                     <div className="mt-6 text-center p-6 bg-slate-50 rounded-xl border border-slate-200">
                       <p className="text-slate-100">
@@ -329,7 +387,8 @@ export function BookingPage({ walletAddress }: BookingPageProps) {
                 </div>
 
                 {currentDay.slots.every(
-                  (slot: TimeSlot) => !slot.available || isSlotBooked(slot._id)
+                  (slot: TimeSlot) =>
+                    !(slot.available ?? !slot.booked) || isSlotBooked(slot._id),
                 ) && (
                   <div className="mt-6 text-center p-6 bg-slate-50 rounded-xl border border-slate-200">
                     <p className="text-slate-100">
@@ -346,13 +405,16 @@ export function BookingPage({ walletAddress }: BookingPageProps) {
 
       <BookingModal
         isOpen={isModalOpen}
-        onClose={() => setIsModalOpen(false)}
+        onClose={handleModalClose}
         slot={selectedSlot}
-        date={currentDay.date}
+        date={selectedSlotDate || ''}
         userName={userData.user.fullName}
         hourlyRate={userData.user.hourlyRate}
         creatorAddress={walletAddress}
         onBookingComplete={handleBookingComplete}
+        creatorEmail={userData.user.email}
+        creatorName={userData.user.fullName}
+        creatorTimezone={userData.timezone || 'UTC'}
       />
     </div>
   );

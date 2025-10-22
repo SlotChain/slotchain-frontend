@@ -1,9 +1,9 @@
-import { useEffect, useState } from "react";
-import { Plus, Trash2, Globe } from "lucide-react";
-import { TimeSlot, WeekAvailability } from "../types";
-import { useToast } from "../context/ToastContext";
-import { useNotifications } from "../context/NotificationContext";
-import moment from "moment-timezone";
+import { useEffect, useMemo, useState } from 'react';
+import { Plus, Trash2, Globe } from 'lucide-react';
+import { TimeSlot, WeekAvailability } from '../types';
+import { useToast } from '../context/ToastContext';
+import { useNotifications } from '../context/NotificationContext';
+import moment from 'moment-timezone';
 
 interface AvailabilityViewProps {
   walletAddress: string;
@@ -11,20 +11,20 @@ interface AvailabilityViewProps {
 }
 
 const DAYS = [
-  { key: "monday", label: "Monday" },
-  { key: "tuesday", label: "Tuesday" },
-  { key: "wednesday", label: "Wednesday" },
-  { key: "thursday", label: "Thursday" },
-  { key: "friday", label: "Friday" },
-  { key: "saturday", label: "Saturday" },
-  { key: "sunday", label: "Sunday" },
+  { key: 'monday', label: 'Monday' },
+  { key: 'tuesday', label: 'Tuesday' },
+  { key: 'wednesday', label: 'Wednesday' },
+  { key: 'thursday', label: 'Thursday' },
+  { key: 'friday', label: 'Friday' },
+  { key: 'saturday', label: 'Saturday' },
+  { key: 'sunday', label: 'Sunday' },
 ] as const;
 
 const DEFAULT_SLOT: TimeSlot = {
-  walletAddress: "",
-  start: "09:00",
-  end: "17:00",
-  _id: "",
+  walletAddress: '',
+  start: '09:00',
+  end: '17:00',
+  _id: '',
   booked: false,
 };
 
@@ -36,21 +36,22 @@ export function AvailabilityView({
   const [saving, setSaving] = useState(false);
   const { showToast } = useToast();
   const { addNotification } = useNotifications();
-  const allTimezones = moment.tz.names();
-  const [timezone, setTimezone] = useState(moment.tz.guess());
+  const timezoneOptions = useMemo(() => moment.tz.names(), []);
+  const guessedTimezone = useMemo(() => moment.tz.guess(true) || 'UTC', []);
+  const [timezone, setTimezone] = useState<string>(guessedTimezone);
   const [interval, setInterval] = useState<number>(30);
 
-  const today = moment().format("YYYY-MM-DD");
+  const today = moment().format('YYYY-MM-DD');
   // temporary inputs for adding an unavailable range (do NOT reuse rangeStart/rangeEnd)
   const [tempUnavailableStart, setTempUnavailableStart] =
     useState<string>(today);
   const [tempUnavailableEnd, setTempUnavailableEnd] = useState<string>(
-    moment().add(1, "days").format("YYYY-MM-DD")
+    moment().add(1, 'days').format('YYYY-MM-DD'),
   );
 
   const [rangeStart, setRangeStart] = useState<string>(today);
   const [rangeEnd, setRangeEnd] = useState<string>(
-    moment().add(30, "days").format("YYYY-MM-DD")
+    moment().add(30, 'days').format('YYYY-MM-DD'),
   );
   const [infinite, setInfinite] = useState<boolean>(false);
 
@@ -91,7 +92,7 @@ export function AvailabilityView({
 
     try {
       const res = await fetch(
-        `http://localhost:5000/api/availability/getAvailability/${wallet}`
+        `http://localhost:5000/api/availability/getAvailability/${wallet}`,
       );
       if (!res.ok) throw new Error(`Failed: ${res.status}`);
       const json = await res.json();
@@ -99,26 +100,26 @@ export function AvailabilityView({
       const result = json?.data;
       if (!result) return;
 
-      setTimezone(result.timezone || moment.tz.guess());
       setInterval(result.interval || 30);
       setRangeStart(result.range?.start || today);
       setRangeEnd(
-        result.range?.end || moment().add(30, "days").format("YYYY-MM-DD")
+        result.range?.end || moment().add(30, 'days').format('YYYY-MM-DD'),
       );
       setInfinite(result.range?.infinite || false);
       setUnavailableRanges(result.unavailableRanges || []);
       setDailyRecords(result.availableDays || []);
+      setTimezone(result.timezone || guessedTimezone);
 
       // Reconstruct weekly availability
       if (result.availableDays?.length > 0) {
         const days: (keyof WeekAvailability)[] = [
-          "monday",
-          "tuesday",
-          "wednesday",
-          "thursday",
-          "friday",
-          "saturday",
-          "sunday",
+          'monday',
+          'tuesday',
+          'wednesday',
+          'thursday',
+          'friday',
+          'saturday',
+          'sunday',
         ];
 
         // Start with default empty week
@@ -136,10 +137,10 @@ export function AvailabilityView({
                 : [
                     {
                       _id: `${rec.date}-default-1`,
-                      start: "09:00",
-                      end: "09:30",
+                      start: '09:00',
+                      end: '09:30',
                       booked: false,
-                      walletAddress: "", // must include this
+                      walletAddress: '', // must include this
                     },
                   ];
 
@@ -149,7 +150,7 @@ export function AvailabilityView({
             if (!weekAvailability[weekday].enabled) {
               weekAvailability[weekday] = { enabled: true, slots: daySlots };
             }
-          }
+          },
         );
 
         setAvailability(weekAvailability);
@@ -157,8 +158,8 @@ export function AvailabilityView({
         setAvailability(defaultAvailability);
       }
     } catch (err) {
-      console.error("fetchAvailability", err);
-      showToast("Error fetching availability", "error");
+      console.error('fetchAvailability', err);
+      showToast('Error fetching availability', 'error');
     }
   };
 
@@ -168,17 +169,17 @@ export function AvailabilityView({
 
   const generateDateRange = (start: string, end: string, maxDays = 365) => {
     const result: string[] = [];
-    let cur = moment(start, "YYYY-MM-DD");
-    const last = moment(end, "YYYY-MM-DD");
+    let cur = moment(start, 'YYYY-MM-DD');
+    const last = moment(end, 'YYYY-MM-DD');
     while (cur.isSameOrBefore(last) && result.length < maxDays) {
-      result.push(cur.format("YYYY-MM-DD"));
-      cur.add(1, "day");
+      result.push(cur.format('YYYY-MM-DD'));
+      cur.add(1, 'day');
     }
     return result;
   };
   const generatePerDateSlots = () => {
     const finalEnd = infinite
-      ? moment(rangeStart).add(365, "days").format("YYYY-MM-DD")
+      ? moment(rangeStart).add(365, 'days').format('YYYY-MM-DD')
       : rangeEnd;
 
     const allDates = generateDateRange(rangeStart, finalEnd);
@@ -196,7 +197,7 @@ export function AvailabilityView({
 
         // split slots into intervals
         const slots = slotsToUse.flatMap((slot) =>
-          splitIntoIntervals(slot.start, slot.end, interval)
+          splitIntoIntervals(slot.start, slot.end, interval),
         );
 
         return { date, slots };
@@ -206,21 +207,21 @@ export function AvailabilityView({
   };
 
   const weekdayKeyFromDate = (dateStr: string): keyof WeekAvailability =>
-    moment(dateStr, "YYYY-MM-DD")
-      .format("dddd")
+    moment(dateStr, 'YYYY-MM-DD')
+      .format('dddd')
       .toLowerCase() as keyof WeekAvailability;
 
   const isDateInUnavailable = (dateStr: string) => {
-    const d = moment(dateStr, "YYYY-MM-DD");
+    const d = moment(dateStr, 'YYYY-MM-DD');
     return unavailableRanges.some((r) =>
-      d.isBetween(moment(r.start), moment(r.end), "day", "[]")
+      d.isBetween(moment(r.start), moment(r.end), 'day', '[]'),
     );
   };
 
   /** 🔹 Save availability */
   const handleSave = async () => {
     if (!wallet) {
-      showToast("Please connect your wallet first.", "info");
+      showToast('Please connect your wallet first.', 'info');
       return;
     }
 
@@ -245,24 +246,21 @@ export function AvailabilityView({
       const res = await fetch(
         `http://localhost:5000/api/availability/save/${wallet}`,
         {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
-        }
+        },
       );
-      console.log("Payload:", JSON.stringify(payload, null, 2));
 
       const response = await res.json();
-      if (!res.ok || !response) throw new Error("Failed to save");
+      if (!res.ok || !response) throw new Error('Failed to save');
 
-      console.log("✅ Saved", response);
-
-      await fetchAvailability();
-      showToast("Availability saved successfully!", "success");
-      addNotification("Your availability was updated.");
+      // await fetchAvailability();
+      showToast('Availability saved successfully!', 'success');
+      addNotification('Your availability was updated.');
     } catch (err) {
-      console.error("❌ Save failed", err);
-      showToast("Error saving availability", "error");
+      console.error('❌ Save failed', err);
+      showToast('Error saving availability', 'error');
     } finally {
       setSaving(false);
     }
@@ -271,25 +269,25 @@ export function AvailabilityView({
   /** 🔹 Utility for slot splitting */
   const splitIntoIntervals = (start: string, end: string, interval: number) => {
     const slots: { start: string; end: string }[] = [];
-    let current = moment(start, "HH:mm");
-    const endMoment = moment(end, "HH:mm");
+    let current = moment(start, 'HH:mm');
+    const endMoment = moment(end, 'HH:mm');
     while (current.isBefore(endMoment)) {
-      const next = moment(current).add(interval, "minutes");
+      const next = moment(current).add(interval, 'minutes');
       if (next.isAfter(endMoment)) break;
-      slots.push({ start: current.format("HH:mm"), end: next.format("HH:mm") });
+      slots.push({ start: current.format('HH:mm'), end: next.format('HH:mm') });
       current = next;
     }
     return slots;
   };
 
   const normalizeAndMergeRanges = (
-    ranges: { start: string; end: string }[]
+    ranges: { start: string; end: string }[],
   ) => {
     if (ranges.length === 0) return [];
 
     // sort by start
     const sorted = [...ranges].sort((a, b) =>
-      moment(a.start).isBefore(moment(b.start)) ? -1 : 1
+      moment(a.start).isBefore(moment(b.start)) ? -1 : 1,
     );
 
     const merged: { start: string; end: string }[] = [];
@@ -298,7 +296,7 @@ export function AvailabilityView({
     for (let i = 1; i < sorted.length; i++) {
       const r = sorted[i];
       // if overlapping or contiguous (end >= next.start - 1 day), merge
-      if (moment(r.start).isSameOrBefore(moment(current.end).add(1, "day"))) {
+      if (moment(r.start).isSameOrBefore(moment(current.end).add(1, 'day'))) {
         // extend end if needed
         if (moment(r.end).isAfter(moment(current.end))) {
           current.end = r.end;
@@ -319,7 +317,7 @@ export function AvailabilityView({
 
     // Basic validation: start must be <= end
     if (moment(start).isAfter(moment(end))) {
-      showToast("Unavailable start must be before or equal to end", "error");
+      showToast('Unavailable start must be before or equal to end', 'error');
       return;
     }
 
@@ -330,7 +328,7 @@ export function AvailabilityView({
 
     // optional: reset temp inputs or set to next default
     setTempUnavailableStart(start);
-    setTempUnavailableEnd(moment(end).add(1, "days").format("YYYY-MM-DD"));
+    setTempUnavailableEnd(moment(end).add(1, 'days').format('YYYY-MM-DD'));
   };
 
   const handleRemoveUnavailable = (index: number) =>
@@ -367,15 +365,15 @@ export function AvailabilityView({
   const updateTimeSlot = (
     day: keyof WeekAvailability,
     i: number,
-    field: "start" | "end",
-    val: string
+    field: 'start' | 'end',
+    val: string,
   ) =>
     setAvailability((prev) => ({
       ...prev,
       [day]: {
         ...prev[day],
         slots: prev[day].slots.map((slot, idx) =>
-          idx === i ? { ...slot, [field]: val } : slot
+          idx === i ? { ...slot, [field]: val } : slot,
         ),
       },
     }));
@@ -384,7 +382,7 @@ export function AvailabilityView({
   /** 🔹 Count preview */
   const previewGeneratedCount = () => {
     const finalEnd = infinite
-      ? moment(rangeStart).add(365, "days").format("YYYY-MM-DD")
+      ? moment(rangeStart).add(365, 'days').format('YYYY-MM-DD')
       : rangeEnd;
 
     const allDates = generateDateRange(rangeStart, finalEnd);
@@ -401,7 +399,7 @@ export function AvailabilityView({
 
       // Count slots after splitting into intervals
       const slots = dayData.slots.flatMap((slot) =>
-        splitIntoIntervals(slot.start, slot.end, interval)
+        splitIntoIntervals(slot.start, slot.end, interval),
       );
 
       count += slots.length;
@@ -430,14 +428,18 @@ export function AvailabilityView({
         <select
           value={timezone}
           onChange={(e) => setTimezone(e.target.value)}
-          className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all"
+          className="w-full px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-700 text-gray-900 dark:text-white"
         >
-          {allTimezones.map((tz) => (
+          {timezoneOptions.map((tz) => (
             <option key={tz} value={tz}>
               {tz}
             </option>
           ))}
         </select>
+        <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
+          All availability is stored and displayed in UTC so on-chain booking
+          times remain consistent worldwide.
+        </p>
       </div>
 
       {/* Interval + Date Range */}
@@ -488,7 +490,7 @@ export function AvailabilityView({
                   type="checkbox"
                   checked={infinite}
                   onChange={(e) => setInfinite(e.target.checked)}
-                />{" "}
+                />{' '}
                 Infinite
               </label>
             </div>
@@ -542,7 +544,7 @@ export function AvailabilityView({
           )}
 
           <div className="mt-3 text-sm text-gray-600 dark:text-gray-400">
-            Preview will generate{" "}
+            Preview will generate{' '}
             <span className="font-medium">{previewGeneratedCount()}</span> date
             records using {interval}-minute slots (unavailable dates are
             excluded).
@@ -566,21 +568,21 @@ export function AvailabilityView({
                       onClick={() => toggleDay(key)}
                       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
                         dayData.enabled
-                          ? "bg-blue-600"
-                          : "bg-gray-200 dark:bg-gray-700"
+                          ? 'bg-blue-600'
+                          : 'bg-gray-200 dark:bg-gray-700'
                       }`}
                     >
                       <span
                         className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                          dayData.enabled ? "translate-x-6" : "translate-x-1"
+                          dayData.enabled ? 'translate-x-6' : 'translate-x-1'
                         }`}
                       />
                     </button>
                     <span
                       className={`font-medium ${
                         dayData.enabled
-                          ? "text-gray-900 dark:text-white"
-                          : "text-gray-400 dark:text-gray-500"
+                          ? 'text-gray-900 dark:text-white'
+                          : 'text-gray-400 dark:text-gray-500'
                       }`}
                     >
                       {label}
@@ -612,14 +614,14 @@ export function AvailabilityView({
                               updateTimeSlot(
                                 key,
                                 index,
-                                "start",
-                                e.target.value
+                                'start',
+                                e.target.value,
                               )
                             }
                             className={`px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all ${
                               slot.booked
-                                ? "bg-red-500 text-white cursor-not-allowed border-red-600"
-                                : "bg-white dark:bg-gray-700 text-gray-900 dark:text-white border-gray-300 dark:border-gray-600"
+                                ? 'bg-red-500 text-white cursor-not-allowed border-red-600'
+                                : 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white border-gray-300 dark:border-gray-600'
                             }`}
                             disabled={slot.booked}
                           />
@@ -631,12 +633,12 @@ export function AvailabilityView({
                             value={slot.end}
                             onChange={(e) =>
                               !slot.booked &&
-                              updateTimeSlot(key, index, "end", e.target.value)
+                              updateTimeSlot(key, index, 'end', e.target.value)
                             }
                             className={`px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all ${
                               slot.booked
-                                ? "bg-red-500 text-white cursor-not-allowed border-red-600"
-                                : "bg-white dark:bg-gray-700 text-gray-900 dark:text-white border-gray-300 dark:border-gray-600"
+                                ? 'bg-red-500 text-white cursor-not-allowed border-red-600'
+                                : 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white border-gray-300 dark:border-gray-600'
                             }`}
                             disabled={slot.booked}
                           />
@@ -676,16 +678,16 @@ export function AvailabilityView({
           disabled={saving}
           title={
             !wallet
-              ? "Connect or login to save availability"
-              : "Save availability"
+              ? 'Connect or login to save availability'
+              : 'Save availability'
           }
           className="px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white font-medium rounded-lg shadow-sm hover:shadow-md transition-all disabled:cursor-not-allowed"
         >
           {saving
-            ? "Saving..."
+            ? 'Saving...'
             : !wallet
-            ? "Connect to save"
-            : "Save Availability"}
+              ? 'Connect to save'
+              : 'Save Availability'}
         </button>
       </div>
 
@@ -718,14 +720,14 @@ export function AvailabilityView({
                       <span>{rec.date}</span>
                       <span className="text-sm text-gray-500 dark:text-gray-400">
                         {rec.slots?.length ?? 0} slot
-                        {rec.slots?.length === 1 ? "" : "s"}
+                        {rec.slots?.length === 1 ? '' : 's'}
                       </span>
                     </div>
                   ))}
 
                   {dailyRecords.length > 6 && (
                     <p className="text-gray-400 text-sm italic">
-                      Showing first 3 and last 3 dates out of{" "}
+                      Showing first 3 and last 3 dates out of{' '}
                       {dailyRecords.length} total.
                     </p>
                   )}

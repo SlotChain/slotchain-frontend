@@ -1,12 +1,12 @@
-import { useState, useRef } from "react";
-import { Calendar, Upload, X, Wallet, ArrowRight } from "lucide-react";
-import slotChainABI from "../../contractABI/SlotChainABI.json";
+import { useState, useRef } from 'react';
+import { Calendar, Upload, X, Wallet, ArrowRight } from 'lucide-react';
+import slotChainABI from '../../contractABI/SlotChainABI.json';
 
-import { useConnect, useWriteContract } from "wagmi";
-import { metaMask } from "wagmi/connectors";
+import { useConnect, useWriteContract } from 'wagmi';
+import { metaMask } from 'wagmi/connectors';
 
-import { waitForTransactionReceipt } from "@wagmi/core";
-import { config } from "../config";
+import { waitForTransactionReceipt } from '@wagmi/core';
+import { config } from '../config';
 
 interface SignupProps {
   onSignupComplete: (userData: SignupData) => void;
@@ -30,13 +30,13 @@ export function Signup({
   connectedWallet,
 }: SignupProps) {
   const [formData, setFormData] = useState<SignupData>({
-    walletAddress: connectedWallet || "",
-    fullName: "",
-    email: "",
-    bio: "",
+    walletAddress: connectedWallet || '',
+    fullName: '',
+    email: '',
+    bio: '',
     profilePhoto: null,
-    hourlyRate: "",
-    currency: "ETH",
+    hourlyRate: '',
+    currency: 'USDT',
   });
 
   const contractAddress = import.meta.env.VITE_SLOCTCHAIN_CONTRACT;
@@ -53,7 +53,7 @@ export function Signup({
   const handleInputChange = (
     e: React.ChangeEvent<
       HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
-    >
+    >,
   ) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
@@ -75,7 +75,7 @@ export function Signup({
     setFormData((prev) => ({ ...prev, profilePhoto: null }));
     setPreviewUrl(null);
     if (fileInputRef.current) {
-      fileInputRef.current.value = "";
+      fileInputRef.current.value = '';
     }
   };
   // const handleSubmit = async (e: React.FormEvent) => {
@@ -132,25 +132,25 @@ export function Signup({
 
     try {
       if (!formData.profilePhoto) {
-        alert("Please upload a profile photo before continuing.");
+        alert('Please upload a profile photo before continuing.');
         setIsSubmitting(false);
         return;
       }
 
       // ✅ Step 1: Send data to backend for IPFS upload
       const formDataToSend = new FormData();
-      formDataToSend.append("walletAddress", formData.walletAddress);
-      formDataToSend.append("fullName", formData.fullName);
-      formDataToSend.append("email", formData.email);
-      formDataToSend.append("bio", formData.bio);
-      formDataToSend.append("hourlyRate", formData.hourlyRate);
-      formDataToSend.append("currency", formData.currency);
+      formDataToSend.append('walletAddress', formData.walletAddress);
+      formDataToSend.append('fullName', formData.fullName);
+      formDataToSend.append('email', formData.email);
+      formDataToSend.append('bio', formData.bio);
+      formDataToSend.append('hourlyRate', formData.hourlyRate);
+      formDataToSend.append('currency', formData.currency);
       if (formData.profilePhoto) {
-        formDataToSend.append("profilePhoto", formData.profilePhoto);
+        formDataToSend.append('profilePhoto', formData.profilePhoto);
       }
 
-      const response = await fetch("http://localhost:5000/api/auth/signup", {
-        method: "POST",
+      const response = await fetch('http://localhost:5000/api/auth/signup', {
+        method: 'POST',
         body: formDataToSend,
       });
 
@@ -159,8 +159,8 @@ export function Signup({
 
       const result = await response.json();
 
-      if (result.status !== "created" && result.status !== "existing_user") {
-        alert("Something went wrong during signup.");
+      if (result.status !== 'created' && result.status !== 'existing_user') {
+        alert('Something went wrong during signup.');
         setIsSubmitting(false);
         return;
       }
@@ -173,18 +173,16 @@ export function Signup({
       if (!isConnected) {
         const connection = await connectAsync({ connector: metaMask() });
         userAddress = connection.accounts[0];
-        console.log("Connected wallet:", userAddress);
       }
-      console.log("Calling createProfile on contract:", contractAddress);
 
       const scaledHourlyRate = Math.floor(
-        Number(formData.hourlyRate) * 1_000_000
+        Number(formData.hourlyRate) * 1_000_000,
       );
 
       const txHash = await writeContractAsync({
         address: contractAddress as `0x${string}`,
         abi: slotChainABI,
-        functionName: "createProfile",
+        functionName: 'createProfile',
         args: [scaledHourlyRate, metadataURI],
         chainId: 11155111,
         gas: 1_000_000n,
@@ -194,10 +192,10 @@ export function Signup({
 
       // ✅ Step 5: Update UI
       onSignupComplete(result.user);
-      alert("Profile created successfully!");
+      alert('Profile created successfully!');
     } catch (error) {
-      console.error("Signup + Create Profile failed:", error);
-      alert("Something went wrong during profile creation.");
+      console.error('Signup + Create Profile failed:', error);
+      alert('Something went wrong during profile creation.');
     } finally {
       setIsSubmitting(false);
     }
@@ -418,7 +416,7 @@ export function Signup({
 
         <div className="mt-6 text-center">
           <p className="text-slate-400 text-sm">
-            Already have an account?{" "}
+            Already have an account?{' '}
             <button
               onClick={onBackToLogin}
               className="text-cyan-400 hover:text-cyan-300 font-semibold transition-colors"

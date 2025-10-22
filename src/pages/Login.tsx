@@ -1,6 +1,6 @@
-import { useState } from "react";
-import { ethers } from "ethers";
-import { Calendar, Wallet, Shield, Zap } from "lucide-react";
+import { useState } from 'react';
+import { ethers } from 'ethers';
+import { Calendar, Wallet, Shield, Zap } from 'lucide-react';
 
 interface LoginProps {
   onLogin: (walletAddress: string) => void;
@@ -13,19 +13,9 @@ export function Login({ onLogin, onSignupRedirect }: LoginProps) {
 
   const wallets = [
     {
-      name: "MetaMask",
-      icon: "🦊",
-      description: "Connect using MetaMask browser extension",
-    },
-    {
-      name: "WalletConnect",
-      icon: "🔗",
-      description: "Connect using WalletConnect protocol",
-    },
-    {
-      name: "Coinbase Wallet",
-      icon: "💼",
-      description: "Connect using Coinbase Wallet",
+      name: 'MetaMask',
+      icon: '🦊',
+      description: 'Connect using MetaMask browser extension',
     },
   ];
   const handleWalletConnect = async (walletName: string) => {
@@ -34,22 +24,22 @@ export function Login({ onLogin, onSignupRedirect }: LoginProps) {
 
     try {
       if (!window.ethereum) {
-        alert("Please install MetaMask!");
+        alert('Please install MetaMask!');
         setConnecting(false);
         return;
       }
 
       // 1️⃣ Connect to the wallet
       const provider = new ethers.BrowserProvider(window.ethereum);
-      const accounts = await provider.send("eth_requestAccounts", []);
+      const accounts = await provider.send('eth_requestAccounts', []);
       const address = accounts[0];
 
       // 2️⃣ Get message from backend to sign
       const messageRes = await fetch(
-        "http://localhost:5000/api/auth/login-message",
+        'http://localhost:5000/api/auth/login-message',
         {
-          method: "POST",
-        }
+          method: 'POST',
+        },
       );
       const { message } = await messageRes.json();
 
@@ -58,27 +48,27 @@ export function Login({ onLogin, onSignupRedirect }: LoginProps) {
       const signature = await signer.signMessage(message);
 
       // 4️⃣ Send wallet + signature to backend for verification
-      const loginRes = await fetch("http://localhost:5000/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
+      const loginRes = await fetch('http://localhost:5000/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ walletAddress: address, signature }),
       });
 
       const data = await loginRes.json();
 
       // 5️⃣ Handle response
-      if (data.status === "existing_user") {
-        console.log("✅ User exists:", data.user);
+      if (data.status === 'existing_user') {
+        console.log('✅ User exists:', data.user);
         onLogin(data.user.walletAddress); // send user data to dashboard
-      } else if (data.status === "new_user") {
-        console.log("🆕 New user detected — redirecting to signup");
+      } else if (data.status === 'new_user') {
+        console.log('🆕 New user detected — redirecting to signup');
         onSignupRedirect(address); // ✅ pass connected wallet address
       } else {
-        alert("Unexpected response from server.");
+        alert('Unexpected response from server.');
       }
     } catch (err) {
-      console.error("❌ Wallet connection error:", err);
-      alert("Wallet connection failed. Check console for details.");
+      console.error('❌ Wallet connection error:', err);
+      alert('Wallet connection failed. Check console for details.');
     } finally {
       setConnecting(false);
     }
@@ -144,7 +134,7 @@ export function Login({ onLogin, onSignupRedirect }: LoginProps) {
 
         <div className="mt-6 text-center">
           <p className="text-slate-400 text-sm">
-            New to SlotChain?{" "}
+            New to SlotChain?{' '}
             <button
               onClick={onSignupRedirect}
               className="text-cyan-400 hover:text-cyan-300 font-semibold transition-colors"
@@ -155,11 +145,11 @@ export function Login({ onLogin, onSignupRedirect }: LoginProps) {
         </div>
 
         <div className="mt-8 text-center text-xs text-slate-500">
-          By connecting, you agree to our{" "}
+          By connecting, you agree to our{' '}
           <a href="#" className="text-cyan-400 hover:text-cyan-300">
             Terms of Service
-          </a>{" "}
-          and{" "}
+          </a>{' '}
+          and{' '}
           <a href="#" className="text-cyan-400 hover:text-cyan-300">
             Privacy Policy
           </a>
