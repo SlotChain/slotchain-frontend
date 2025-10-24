@@ -6,7 +6,7 @@ import {
   Zap,
   Calendar,
   LucideIcon,
-} from "lucide-react";
+} from 'lucide-react';
 
 interface Feature {
   icon: LucideIcon;
@@ -17,39 +17,38 @@ interface Feature {
 const features: Feature[] = [
   {
     icon: Wallet,
-    title: "Crypto Payments",
-    description:
-      "Accept Bitcoin, Ethereum, USDT, and 50+ cryptocurrencies instantly with zero chargebacks.",
+    title: 'Crypto Payments',
+    description: 'Accept USDT on base for now, more tokens/coins coming soon',
   },
   {
     icon: Shield,
-    title: "Trustless & Secure",
+    title: 'Trustless & Secure',
     description:
-      "Smart contracts ensure automatic payment release. No intermediaries, no disputes.",
+      'Smart contracts ensure automatic payment release. No intermediaries, no disputes.',
   },
   {
     icon: Globe,
-    title: "Global Access",
+    title: 'Global Access',
     description:
-      "Work with clients worldwide without currency conversion or bank restrictions.",
+      'Work with clients worldwide without currency conversion or bank restrictions.',
   },
   {
     icon: Lock,
-    title: "Privacy First",
+    title: 'Privacy First',
     description:
-      "Your financial data stays private. No KYC required for basic transactions.",
+      'Your financial data stays private. No KYC required for basic transactions.',
   },
   {
     icon: Zap,
-    title: "Instant Settlement",
+    title: 'Instant Settlement',
     description:
-      "Get paid instantly when bookings are confirmed. No waiting for payment processors.",
+      'Get paid instantly when bookings are confirmed. No waiting for payment processors.',
   },
   {
     icon: Calendar,
-    title: "Smart Scheduling",
+    title: 'Smart Scheduling',
     description:
-      "Automated booking links, timezone detection, and calendar sync across all platforms.",
+      'Automated booking links, timezone detection, and calendar sync across all platforms.',
   },
 ];
 

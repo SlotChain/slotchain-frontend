@@ -1,11 +1,11 @@
-import { Navbar } from "../components/Navbar";
-import { Footer } from "../components/Footer";
-import { Hero } from "../sections/Hero";
-import { Features } from "../sections/Features";
-import { HowItWorks } from "../sections/HowItWorks";
-import { Pricing } from "../sections/Pricing";
-import { CTA } from "../sections/CTA";
-import { Ticket } from "./Ticket";
+import { Navbar } from '../components/Navbar';
+import { Footer } from '../components/Footer';
+import { Hero } from '../sections/Hero';
+import { Features } from '../sections/Features';
+import { HowItWorks } from '../sections/HowItWorks';
+import { Pricing } from '../sections/Pricing';
+import { CTA } from '../sections/CTA';
+import { Ticket } from './Ticket';
 
 interface LandingPageProps {
   onLaunchApp: () => void;
@@ -19,7 +19,7 @@ export function LandingPage({ onLaunchApp }: LandingPageProps) {
       <Hero />
       <Features />
       <HowItWorks />
-      <Pricing />
+      {/* <Pricing /> */}
       <CTA />
       <Footer />
     </div>

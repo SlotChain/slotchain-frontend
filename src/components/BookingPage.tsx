@@ -9,6 +9,7 @@ import {
 import moment from 'moment-timezone';
 import { TimeSlot, AvailableDay } from '../types';
 import BookingModal from './BookingModal';
+import { backendUrl } from '../utils/backend';
 
 interface BookingPageProps {
   walletAddress: string;
@@ -57,11 +58,11 @@ export function BookingPage({ walletAddress }: BookingPageProps) {
     setLoading(true);
     try {
       const res = await fetch(
-        `http://localhost:5000/api/availability/getAvailability/${walletAddress}`,
+        backendUrl(`/api/availability/getAvailability/${walletAddress}`),
       );
 
       const userProfile = await fetch(
-        `http://localhost:5000/api/auth/user/${walletAddress}`,
+        backendUrl(`/api/auth/user/${walletAddress}`),
       );
 
       if (!res.ok || !userProfile.ok)
@@ -80,35 +81,43 @@ export function BookingPage({ walletAddress }: BookingPageProps) {
       // 🧩 Transform API shape → UI shape
       const normalizedDays = data.availableDays
         .map((day: any) => {
-          const slots = day.slots
-            .filter((t: any) => {
-              const slotEndMoment = moment.tz(
-                `${day.date} ${t.end}`,
-                'YYYY-MM-DD HH:mm',
-                timezone,
-              );
-              return slotEndMoment.isSameOrAfter(nowInTimezone);
-            })
-            .map((t: any) => {
-              const id = `${day.date}-${t.start}`; // UI-friendly ID
+          const dayStart = moment.tz(
+            `${day.date} 00:00`,
+            'YYYY-MM-DD HH:mm',
+            timezone,
+          );
+          if (dayStart.isBefore(nowInTimezone, 'day')) {
+            return null;
+          }
 
-              return {
-                id, // local UI ID
-                _id: t._id, // ✅ preserve MongoDB _id for booking
-                start: t.start,
-                end: t.end,
-                booked: t.booked,
-                time: formatSlotLabel(day.date, t.start, t.end, timezone),
-                available: !t.booked,
-              };
-            });
+          const slots = day.slots.map((t: any) => {
+            const slotEndMoment = moment.tz(
+              `${day.date} ${t.end}`,
+              'YYYY-MM-DD HH:mm',
+              timezone,
+            );
+            const isUpcoming = slotEndMoment.isSameOrAfter(nowInTimezone);
+            const id = `${day.date}-${t.start}`; // UI-friendly ID
+
+            return {
+              id, // local UI ID
+              _id: t._id, // ✅ preserve MongoDB _id for booking
+              start: t.start,
+              end: t.end,
+              booked: t.booked,
+              time: formatSlotLabel(day.date, t.start, t.end, timezone),
+              available: !t.booked && isUpcoming,
+              isPast: !isUpcoming,
+              walletAddress: walletAddress,
+            };
+          });
 
           return {
             date: day.date,
             slots,
           };
         })
-        .filter((day: any) => day.slots.length > 0);
+        .filter((day: any) => day && day.slots.length > 0);
 
       const normalizedData = {
         user: {
@@ -259,7 +268,7 @@ export function BookingPage({ walletAddress }: BookingPageProps) {
                   <div>
                     <div className="text-sm text-slate-100">Hourly Rate</div>
                     <div className="font-semibold text-lg text-slate-100">
-                      {userData.user.hourlyRate}
+                      {userData.user.hourlyRate} USDT{' '}
                     </div>
                   </div>
                 </div>
@@ -340,6 +349,14 @@ export function BookingPage({ walletAddress }: BookingPageProps) {
                     const isBooked = isSlotBooked(slot._id);
                     const isAvailable =
                       (slot.available ?? !slot.booked) && !isBooked;
+                    const statusLabel = isBooked
+                      ? 'Booked'
+                      : slot.isPast
+                        ? 'Unavailable'
+                        : 'Unavailable';
+                    const disabledClasses = slot.isPast
+                      ? 'bg-slate-700 text-slate-300 border border-slate-600 cursor-not-allowed'
+                      : 'bg-red-500 text-white border-2 border-red-700 cursor-not-allowed';
 
                     return (
                       <button
@@ -349,7 +366,7 @@ export function BookingPage({ walletAddress }: BookingPageProps) {
                         className={`w-full px-6 py-4 rounded-xl font-medium transition-all ${
                           isAvailable
                             ? 'bg-slate-800 hover:bg-blue-900 text-slate-100 border-2 border-slate-200 hover:border-slate-300 hover:shadow-md cursor-pointer'
-                            : 'bg-red-500 text-white border-2 border-red-700 cursor-not-allowed'
+                            : disabledClasses
                         }`}
                       >
                         <div className="flex items-center justify-between">
@@ -363,16 +380,14 @@ export function BookingPage({ walletAddress }: BookingPageProps) {
                               )}
                           </span>
                           {!isAvailable && (
-                            <span className="text-sm">
-                              {isBooked ? 'Booked' : 'Unavailable'}
-                            </span>
+                            <span className="text-sm">{statusLabel}</span>
                           )}
                         </div>
                       </button>
                     );
                   })}
 
-                  {currentDay.slots.every(
+                  {/* {currentDay.slots.every(
                     (slot: TimeSlot) =>
                       !(slot.available ?? !slot.booked) ||
                       isSlotBooked(slot._id),
@@ -383,10 +398,10 @@ export function BookingPage({ walletAddress }: BookingPageProps) {
                         date.
                       </p>
                     </div>
-                  )}
+                  )} */}
                 </div>
 
-                {currentDay.slots.every(
+                {/* {currentDay.slots.every(
                   (slot: TimeSlot) =>
                     !(slot.available ?? !slot.booked) || isSlotBooked(slot._id),
                 ) && (
@@ -396,7 +411,7 @@ export function BookingPage({ walletAddress }: BookingPageProps) {
                       date.
                     </p>
                   </div>
-                )}
+                )} */}
               </div>
             </div>
           </div>

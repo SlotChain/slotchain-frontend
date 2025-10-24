@@ -4,6 +4,7 @@ import { TimeSlot, WeekAvailability } from '../types';
 import { useToast } from '../context/ToastContext';
 import { useNotifications } from '../context/NotificationContext';
 import moment from 'moment-timezone';
+import { backendUrl } from '../utils/backend';
 
 interface AvailabilityViewProps {
   walletAddress: string;
@@ -92,7 +93,7 @@ export function AvailabilityView({
 
     try {
       const res = await fetch(
-        `http://localhost:5000/api/availability/getAvailability/${wallet}`,
+        backendUrl(`/api/availability/getAvailability/${wallet}`),
       );
       if (!res.ok) throw new Error(`Failed: ${res.status}`);
       const json = await res.json();
@@ -243,14 +244,11 @@ export function AvailabilityView({
         availableDays, // ✅ use generated slots
       };
 
-      const res = await fetch(
-        `http://localhost:5000/api/availability/save/${wallet}`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        },
-      );
+      const res = await fetch(backendUrl(`/api/availability/save/${wallet}`), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
 
       const response = await res.json();
       if (!res.ok || !response) throw new Error('Failed to save');

@@ -5,6 +5,7 @@ import { readContract } from '@wagmi/core';
 import SlotChainABI from '../../contractABI/SlotChainABI.json';
 import { config } from '../config';
 import { formatAddress } from '../utils/mockWeb3';
+import { backendUrl } from '../utils/backend';
 
 interface MeetingProps {
   onLeave: () => void;
@@ -12,7 +13,6 @@ interface MeetingProps {
 
 const SLOTCHAIN_CONTRACT_ADDRESS = (import.meta.env.VITE_SLOCTCHAIN_CONTRACT ??
   '') as `0x${string}`;
-const DEFAULT_MEETING_API_BASE = 'http://localhost:5000';
 
 export default function Meeting({ onLeave }: MeetingProps) {
   const { address, isConnected } = useAccount();
@@ -29,8 +29,6 @@ export default function Meeting({ onLeave }: MeetingProps) {
       if (!signMessageAsync) {
         throw new Error('Wallet signing is not available.');
       }
-
-      const apiBase = DEFAULT_MEETING_API_BASE;
 
       const buildError = async (response: Response, fallback: string) => {
         let detail: string | undefined;
@@ -49,7 +47,7 @@ export default function Meeting({ onLeave }: MeetingProps) {
         return errorToThrow;
       };
 
-      const nonceResponse = await fetch(`${apiBase}/api/meetings/nonce`, {
+      const nonceResponse = await fetch(backendUrl('/api/meetings/nonce'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -73,7 +71,7 @@ export default function Meeting({ onLeave }: MeetingProps) {
 
       const signature = await signMessageAsync({ message: noncePayload.nonce });
 
-      const accessResponse = await fetch(`${apiBase}/api/meetings/access`, {
+      const accessResponse = await fetch(backendUrl('/api/meetings/access'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

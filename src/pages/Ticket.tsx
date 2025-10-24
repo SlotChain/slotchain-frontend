@@ -3,7 +3,8 @@ import { Wallet, Calendar, Shield, ChevronRight } from 'lucide-react';
 import { useAccount, useConnect, useSignMessage } from 'wagmi';
 import { readContract } from '@wagmi/core';
 import SlotChainABI from '../../contractABI/SlotChainABI.json';
-import { config } from '../config';
+import { CHAIN_ID, config } from '../config';
+import { BACKEND_API_BASE_URL } from '../utils/backend';
 import AccessVerificationModal from '../components/AccessVerificationModal';
 
 interface TicketProps {
@@ -13,7 +14,6 @@ interface TicketProps {
 
 const SLOTCHAIN_CONTRACT_ADDRESS = (import.meta.env.VITE_SLOCTCHAIN_CONTRACT ??
   '') as `0x${string}`;
-const SEPOLIA_CHAIN_ID = 11155111;
 
 const logTicket = (...args: unknown[]) => {};
 
@@ -48,7 +48,7 @@ export function Ticket({ onAccessGranted }: TicketProps) {
 
       const apiBase =
         (import.meta.env.VITE_MEETING_API_URL as string | undefined) ??
-        'http://localhost:5000';
+        BACKEND_API_BASE_URL;
 
       const buildError = async (response: Response, fallback: string) => {
         let detail: string | undefined;
@@ -291,11 +291,11 @@ export function Ticket({ onAccessGranted }: TicketProps) {
 
       logTicket('handleConnectWallet:connecting', {
         connectorId: connector.id,
-        chainId: SEPOLIA_CHAIN_ID,
+        chainId: CHAIN_ID,
       });
       const result = await connectAsync({
         connector,
-        chainId: SEPOLIA_CHAIN_ID,
+        chainId: CHAIN_ID,
       });
 
       logTicket('handleConnectWallet:connectResult', result);

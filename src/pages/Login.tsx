@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ethers } from 'ethers';
 import { Calendar, Wallet, Shield, Zap } from 'lucide-react';
+import { backendUrl } from '../utils/backend';
 
 interface LoginProps {
   onLogin: (walletAddress: string) => void;
@@ -35,12 +36,9 @@ export function Login({ onLogin, onSignupRedirect }: LoginProps) {
       const address = accounts[0];
 
       // 2️⃣ Get message from backend to sign
-      const messageRes = await fetch(
-        'http://localhost:5000/api/auth/login-message',
-        {
-          method: 'POST',
-        },
-      );
+      const messageRes = await fetch(backendUrl('/api/auth/login-message'), {
+        method: 'POST',
+      });
       const { message } = await messageRes.json();
 
       // 3️⃣ Sign the message with the wallet
@@ -48,7 +46,7 @@ export function Login({ onLogin, onSignupRedirect }: LoginProps) {
       const signature = await signer.signMessage(message);
 
       // 4️⃣ Send wallet + signature to backend for verification
-      const loginRes = await fetch('http://localhost:5000/api/auth/login', {
+      const loginRes = await fetch(backendUrl('/api/auth/login'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ walletAddress: address, signature }),
@@ -58,10 +56,8 @@ export function Login({ onLogin, onSignupRedirect }: LoginProps) {
 
       // 5️⃣ Handle response
       if (data.status === 'existing_user') {
-        console.log('✅ User exists:', data.user);
         onLogin(data.user.walletAddress); // send user data to dashboard
       } else if (data.status === 'new_user') {
-        console.log('🆕 New user detected — redirecting to signup');
         onSignupRedirect(address); // ✅ pass connected wallet address
       } else {
         alert('Unexpected response from server.');

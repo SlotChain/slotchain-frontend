@@ -2,11 +2,17 @@ import { useState, useRef } from 'react';
 import { Calendar, Upload, X, Wallet, ArrowRight } from 'lucide-react';
 import slotChainABI from '../../contractABI/SlotChainABI.json';
 
-import { useConnect, useWriteContract } from 'wagmi';
+import {
+  useAccount,
+  useConnect,
+  useSwitchChain,
+  useWriteContract,
+} from 'wagmi';
 import { metaMask } from 'wagmi/connectors';
 
-import { waitForTransactionReceipt } from '@wagmi/core';
-import { config } from '../config';
+import { readContract, waitForTransactionReceipt } from '@wagmi/core';
+import { CHAIN_ID, config } from '../config';
+import { backendUrl } from '../utils/backend';
 
 interface SignupProps {
   onSignupComplete: (userData: SignupData) => void;
@@ -46,9 +52,10 @@ export function Signup({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const { address, isConnected: walletConnected, chain } = useAccount();
   const { connectAsync } = useConnect();
+  const { switchChainAsync } = useSwitchChain();
   const { writeContractAsync } = useWriteContract();
-  const [isConnected, setIsConnected] = useState(false);
 
   const handleInputChange = (
     e: React.ChangeEvent<
@@ -102,7 +109,7 @@ export function Signup({
   //       formDataToSend.append("profilePhoto", formData.profilePhoto);
   //     }
 
-  //     const response = await fetch("http://localhost:5000/api/auth/signup", {
+  //     const response = await fetch(backendUrl("/api/auth/signup"), {
   //       method: "POST",
   //       body: formDataToSend,
   //     });
@@ -130,6 +137,8 @@ export function Signup({
     e.preventDefault();
     setIsSubmitting(true);
 
+    let signupResult: any = null;
+
     try {
       if (!formData.profilePhoto) {
         alert('Please upload a profile photo before continuing.');
@@ -149,7 +158,7 @@ export function Signup({
         formDataToSend.append('profilePhoto', formData.profilePhoto);
       }
 
-      const response = await fetch('http://localhost:5000/api/auth/signup', {
+      const response = await fetch(backendUrl('/api/auth/signup'), {
         method: 'POST',
         body: formDataToSend,
       });
@@ -157,22 +166,31 @@ export function Signup({
       if (!response.ok)
         throw new Error(`HTTP error! status: ${response.status}`);
 
-      const result = await response.json();
+      signupResult = await response.json();
 
-      if (result.status !== 'created' && result.status !== 'existing_user') {
+      if (
+        signupResult.status !== 'created' &&
+        signupResult.status !== 'existing_user'
+      ) {
         alert('Something went wrong during signup.');
         setIsSubmitting(false);
         return;
       }
 
-      const { contractData } = result;
+      const { contractData } = signupResult;
       const { metadataURI } = contractData;
 
       // ✅ Step 2: Connect wallet if not connected
-      let userAddress = connectedWallet;
-      if (!isConnected) {
-        const connection = await connectAsync({ connector: metaMask() });
+      let userAddress = connectedWallet ?? address ?? undefined;
+      if (!walletConnected) {
+        const connection = await connectAsync({
+          connector: metaMask(),
+          chainId: CHAIN_ID,
+        });
         userAddress = connection.accounts[0];
+      } else if (chain?.id !== CHAIN_ID) {
+        await switchChainAsync?.({ chainId: CHAIN_ID });
+        userAddress = address ?? userAddress;
       }
 
       const scaledHourlyRate = Math.floor(
@@ -184,18 +202,47 @@ export function Signup({
         abi: slotChainABI,
         functionName: 'createProfile',
         args: [scaledHourlyRate, metadataURI],
-        chainId: 11155111,
+        chainId: CHAIN_ID,
         gas: 1_000_000n,
       });
 
       await waitForTransactionReceipt(config, { hash: txHash });
 
       // ✅ Step 5: Update UI
-      onSignupComplete(result.user);
+      onSignupComplete(signupResult.user);
       alert('Profile created successfully!');
     } catch (error) {
       console.error('Signup + Create Profile failed:', error);
-      alert('Something went wrong during profile creation.');
+
+      let profileExists = false;
+
+      try {
+        const contractAddress = import.meta.env
+          .VITE_SLOCTCHAIN_CONTRACT as `0x${string}`;
+
+        const response = (await readContract(config, {
+          address: contractAddress,
+          abi: slotChainABI,
+          functionName: 'creatorsProfiles',
+          args: [signupResult?.user?.walletAddress ?? formData.walletAddress],
+          chainId: CHAIN_ID,
+        })) as [string, bigint, string, boolean];
+
+        profileExists = Boolean(response?.[3]);
+      } catch (readError) {
+        console.warn('Unable to verify on-chain profile after signup error.', {
+          readError,
+        });
+      }
+
+      if (profileExists && signupResult?.user) {
+        onSignupComplete(signupResult.user);
+        alert(
+          'Profile created successfully! (Network confirmation hit an RPC hiccup.)',
+        );
+      } else {
+        alert('Something went wrong during profile creation.');
+      }
     } finally {
       setIsSubmitting(false);
     }

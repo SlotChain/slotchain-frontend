@@ -1,4 +1,4 @@
-import { Calendar } from "lucide-react";
+import { Calendar } from 'lucide-react';
 
 export function Footer() {
   return (
@@ -17,7 +17,7 @@ export function Footer() {
             </p>
           </div>
 
-          {[
+          {/* {[
             {
               title: "Product",
               links: ["Features", "Pricing", "Security", "Roadmap"],
@@ -46,14 +46,14 @@ export function Footer() {
                 ))}
               </ul>
             </div>
-          ))}
+          ))} */}
         </div>
 
         <div className="pt-8 border-t border-slate-800 flex flex-col md:flex-row justify-between items-center gap-4">
           <p className="text-slate-400 text-sm">
             © 2025 SlotChain. All rights reserved.
           </p>
-          <div className="flex gap-6 text-sm text-slate-400">
+          {/* <div className="flex gap-6 text-sm text-slate-400">
             <a href="#" className="hover:text-white transition-colors">
               Privacy Policy
             </a>
@@ -63,7 +63,7 @@ export function Footer() {
             <a href="#" className="hover:text-white transition-colors">
               Cookies
             </a>
-          </div>
+          </div> */}
         </div>
       </div>
     </footer>

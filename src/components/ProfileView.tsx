@@ -8,11 +8,17 @@ import slotChainABI from '../../contractABI/SlotChainABI.json';
 import { Dialog } from '@headlessui/react';
 
 import { useNotifications } from '../context/NotificationContext';
-import { useConnect, useWriteContract } from 'wagmi';
+import {
+  useAccount,
+  useConnect,
+  useSwitchChain,
+  useWriteContract,
+} from 'wagmi';
 import { metaMask } from 'wagmi/connectors';
 
 import { waitForTransactionReceipt, readContract } from '@wagmi/core';
-import { config } from '../config';
+import { CHAIN_ID, config } from '../config';
+import { backendUrl } from '../utils/backend';
 
 interface ProfileViewProps {
   walletAddress: string;
@@ -66,10 +72,26 @@ export function ProfileView({
   const originalWalletRef = useRef<string | null>(walletAddress || null);
   const [copied, setCopied] = useState(false);
 
+  const { address, isConnected, chain } = useAccount();
   const { connectAsync } = useConnect();
+  const { switchChainAsync } = useSwitchChain();
   const { writeContractAsync } = useWriteContract();
-  const [isConnected, setIsConnected] = useState(false);
   const contractAddress = import.meta.env.VITE_SLOCTCHAIN_CONTRACT;
+
+  const frontendBaseUrl =
+    (import.meta.env.VITE_FRONTEND_BASE_URL as string | undefined)?.replace(
+      /\/$/,
+      '',
+    ) || (typeof window !== 'undefined' ? window.location.origin : '');
+
+  const buildBookingUrl = useCallback(
+    (targetAddress: string) => {
+      if (!targetAddress) return '';
+      const base = frontendBaseUrl;
+      return base ? `${base}/book/${targetAddress}` : `/book/${targetAddress}`;
+    },
+    [frontendBaseUrl],
+  );
 
   // don't rely on Router context — navigate via window to support non-routed render
 
@@ -88,8 +110,10 @@ export function ProfileView({
 
   const handleVisit = () => {
     const address = profile.walletAddress || walletAddress || '';
-    const url = `/book/${address}`;
-    window.open(url, '_blank'); // ✅ opens in a new tab
+    const url = buildBookingUrl(address);
+    if (url) {
+      window.open(url, '_blank'); // ✅ opens in a new tab
+    }
   };
 
   const handleChange = (field: keyof ProfileData, value: string) => {
@@ -122,7 +146,7 @@ export function ProfileView({
 
       // ✅ Step 2: Send update request to backend
       const response = await fetch(
-        `http://localhost:5000/api/auth/user/${originalWallet}`,
+        backendUrl(`/api/auth/user/${originalWallet}`),
         {
           method: 'POST',
           body: formDataToSend,
@@ -154,10 +178,16 @@ export function ProfileView({
       );
 
       // ✅ Step 4: Connect wallet if not connected
-      let userAddress = walletAddress;
+      let userAddress = walletAddress || address || '';
       if (!isConnected) {
-        const connection = await connectAsync({ connector: metaMask() });
+        const connection = await connectAsync({
+          connector: metaMask(),
+          chainId: CHAIN_ID,
+        });
         userAddress = connection.accounts[0];
+      } else if (chain?.id !== CHAIN_ID) {
+        await switchChainAsync?.({ chainId: CHAIN_ID });
+        userAddress = address ?? userAddress;
       }
 
       // ✅ Step 5: Call updateProfile on contract
@@ -167,7 +197,7 @@ export function ProfileView({
         abi: slotChainABI,
         functionName: 'updateProfile',
         args: [scaledHourlyRate, metadataURI],
-        chainId: 11155111,
+        chainId: CHAIN_ID,
       });
 
       // ✅ Step 6: Wait for confirmation
@@ -216,7 +246,7 @@ export function ProfileView({
         abi: slotChainABI,
         functionName: 'creatorsProfiles',
         args: [walletAddress],
-        chainId: 11155111, // Sepolia
+        chainId: CHAIN_ID, // Base Sepolia
       })) as [string, bigint, string, boolean];
 
       const [creator, hourlyRateRaw, profileURI, exists] = response;
@@ -470,9 +500,7 @@ export function ProfileView({
             </label>
             <div className="flex items-center gap-3">
               <div className="flex-1 px-4 py-2.5 border border-gray-300 dark:border-gray-600 rounded-lg bg-gray-50 dark:bg-gray-900 text-gray-600 dark:text-gray-400 font-mono text-sm">
-                {`http://localhost:5173/book/${
-                  profile.walletAddress || walletAddress
-                }`}
+                {buildBookingUrl(profile.walletAddress || walletAddress || '')}
               </div>
               <button
                 onClick={handleVisit}

@@ -10,10 +10,12 @@ export interface User {
 }
 
 export interface TimeSlot {
+  id?: string;
   start: string;
   end: string;
   time?: string;
   available?: boolean;
+  isPast?: boolean;
   booked?: boolean;
   _id: string;
   walletAddress: string;

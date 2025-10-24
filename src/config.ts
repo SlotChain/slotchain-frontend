@@ -1,13 +1,14 @@
 import { createConfig, http } from "wagmi";
-import { sepolia } from "wagmi/chains";
+import { baseSepolia } from "wagmi/chains";
 import { metaMask } from "wagmi/connectors";
 
+export const TARGET_CHAIN = baseSepolia;
+export const CHAIN_ID = TARGET_CHAIN.id;
+
 export const config = createConfig({
-  chains: [sepolia],
+  chains: [TARGET_CHAIN],
   connectors: [metaMask()], // ✅ Add MetaMask connector
   transports: {
-    [sepolia.id]: http(
-      "https://sepolia.infura.io/v3/af80bcb2f25c4c0d850b20f2a3605386"
-    ), // ✅ Use Infura or Alchemy endpoint
+    [TARGET_CHAIN.id]: http("https://sepolia.base.org"), // ✅ Base Sepolia RPC endpoint
   },
 });
