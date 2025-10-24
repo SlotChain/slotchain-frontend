@@ -1,4 +1,4 @@
-import { Calendar } from "lucide-react";
+import { Calendar } from 'lucide-react';
 
 interface NavbarProps {
   onLaunchApp?: () => void;
@@ -27,12 +27,12 @@ export function Navbar({ onLaunchApp }: NavbarProps) {
         >
           Features
         </a>
-        <a
+        {/* <a
           href="#pricing"
           className="text-slate-300 hover:text-white transition-colors"
         >
           Pricing
-        </a>
+        </a> */}
         <a
           href="#how-it-works"
           className="text-slate-300 hover:text-white transition-colors"
