@@ -68,7 +68,7 @@ export function Ticket({ onAccessGranted }: TicketProps) {
       };
 
       logTicket('fetchMeetingLink:requestNonce', { apiBase });
-      const nonceResponse = await fetch(`${apiBase}/api/meetings/nonce`, {
+      const nonceResponse = await fetch(`${apiBase}/meetings/nonce`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -101,7 +101,7 @@ export function Ticket({ onAccessGranted }: TicketProps) {
 
       logTicket('fetchMeetingLink:signatureGenerated');
 
-      const accessResponse = await fetch(`${apiBase}/api/meetings/access`, {
+      const accessResponse = await fetch(`${apiBase}/meetings/access`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -145,13 +145,10 @@ export function ProfileView({
       }
 
       // ✅ Step 2: Send update request to backend
-      const response = await fetch(
-        backendUrl(`/api/auth/user/${originalWallet}`),
-        {
-          method: 'POST',
-          body: formDataToSend,
-        },
-      );
+      const response = await fetch(backendUrl(`/auth/user/${originalWallet}`), {
+        method: 'POST',
+        body: formDataToSend,
+      });
 
       if (!response.ok)
         throw new Error(`HTTP error! status: ${response.status}`);

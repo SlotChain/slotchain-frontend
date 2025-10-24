@@ -109,7 +109,7 @@ export function Signup({
   //       formDataToSend.append("profilePhoto", formData.profilePhoto);
   //     }
 
-  //     const response = await fetch(backendUrl("/api/auth/signup"), {
+  //     const response = await fetch(backendUrl("/auth/signup"), {
   //       method: "POST",
   //       body: formDataToSend,
   //     });
@@ -158,7 +158,7 @@ export function Signup({
         formDataToSend.append('profilePhoto', formData.profilePhoto);
       }
 
-      const response = await fetch(backendUrl('/api/auth/signup'), {
+      const response = await fetch(backendUrl('/auth/signup'), {
         method: 'POST',
         body: formDataToSend,
       });

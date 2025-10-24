@@ -172,7 +172,7 @@ export default function BookingModal({
 
       // 5️⃣ Sync with backend
 
-      const res = await fetch(backendUrl('/api/availability/bookSlot'), {
+      const res = await fetch(backendUrl('/availability/bookSlot'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -36,7 +36,7 @@ export function Login({ onLogin, onSignupRedirect }: LoginProps) {
       const address = accounts[0];
 
       // 2️⃣ Get message from backend to sign
-      const messageRes = await fetch(backendUrl('/api/auth/login-message'), {
+      const messageRes = await fetch(backendUrl('/auth/login-message'), {
         method: 'POST',
       });
       const { message } = await messageRes.json();
@@ -46,7 +46,7 @@ export function Login({ onLogin, onSignupRedirect }: LoginProps) {
       const signature = await signer.signMessage(message);
 
       // 4️⃣ Send wallet + signature to backend for verification
-      const loginRes = await fetch(backendUrl('/api/auth/login'), {
+      const loginRes = await fetch(backendUrl('/auth/login'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ walletAddress: address, signature }),

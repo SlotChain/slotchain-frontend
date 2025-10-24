@@ -47,7 +47,7 @@ export default function Meeting({ onLeave }: MeetingProps) {
         return errorToThrow;
       };
 
-      const nonceResponse = await fetch(backendUrl('/api/meetings/nonce'), {
+      const nonceResponse = await fetch(backendUrl('/meetings/nonce'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -71,7 +71,7 @@ export default function Meeting({ onLeave }: MeetingProps) {
 
       const signature = await signMessageAsync({ message: noncePayload.nonce });
 
-      const accessResponse = await fetch(backendUrl('/api/meetings/access'), {
+      const accessResponse = await fetch(backendUrl('/meetings/access'), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

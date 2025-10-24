@@ -93,7 +93,7 @@ export function AvailabilityView({
 
     try {
       const res = await fetch(
-        backendUrl(`/api/availability/getAvailability/${wallet}`),
+        backendUrl(`/availability/getAvailability/${wallet}`),
       );
       if (!res.ok) throw new Error(`Failed: ${res.status}`);
       const json = await res.json();
@@ -244,7 +244,7 @@ export function AvailabilityView({
         availableDays, // ✅ use generated slots
       };
 
-      const res = await fetch(backendUrl(`/api/availability/save/${wallet}`), {
+      const res = await fetch(backendUrl(`/availability/save/${wallet}`), {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),

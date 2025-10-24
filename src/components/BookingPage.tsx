@@ -58,11 +58,11 @@ export function BookingPage({ walletAddress }: BookingPageProps) {
     setLoading(true);
     try {
       const res = await fetch(
-        backendUrl(`/api/availability/getAvailability/${walletAddress}`),
+        backendUrl(`/availability/getAvailability/${walletAddress}`),
       );
 
       const userProfile = await fetch(
-        backendUrl(`/api/auth/user/${walletAddress}`),
+        backendUrl(`/auth/user/${walletAddress}`),
       );
 
       if (!res.ok || !userProfile.ok)
