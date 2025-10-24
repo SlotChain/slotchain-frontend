@@ -1,50 +1,49 @@
-import { Routes, Route, useNavigate } from "react-router-dom";
-import { LandingPage } from "./pages/LandingPage";
-import { Login } from "./pages/Login";
-import { Signup, SignupData } from "./pages/Signup";
-import { Dashboard } from "./pages/Dashboard";
-import { BookingPage } from "./components/BookingPage";
-import Meeting from "./pages/Meeting";
-import { ThemeProvider } from "./context/ThemeContext";
-import { NotificationProvider } from "./context/NotificationContext";
-import { ToastProvider } from "./context/ToastContext";
-import { useParams } from "react-router-dom";
-import { useState } from "react";
-import { WagmiProvider } from "wagmi";
-import { config } from "./config";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Routes, Route, useNavigate } from 'react-router-dom';
+import { LandingPage } from './pages/LandingPage';
+import { Login } from './pages/Login';
+import { Signup, SignupData } from './pages/Signup';
+import { Dashboard } from './pages/Dashboard';
+import { BookingPage } from './components/BookingPage';
+import Meeting from './pages/Meeting';
+import { ThemeProvider } from './context/ThemeContext';
+import { NotificationProvider } from './context/NotificationContext';
+import { ToastProvider } from './context/ToastContext';
+import { useParams } from 'react-router-dom';
+import { useState } from 'react';
+import { WagmiProvider } from 'wagmi';
+import { config } from './config';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 const queryClient = new QueryClient();
 
 function App() {
-  const [walletAddress, setWalletAddress] = useState<string>("");
+  const [walletAddress, setWalletAddress] = useState<string>('');
   const navigate = useNavigate();
 
   function BookingPageRoute() {
     const { walletAddress } = useParams<{ walletAddress: string }>();
-    return <BookingPage walletAddress={walletAddress || ""} />;
+    return <BookingPage walletAddress={walletAddress || ''} />;
   }
 
   // Handlers
   const handleLogin = (address: string) => {
     setWalletAddress(address);
-    navigate("/dashboard");
+    navigate('/dashboard');
   };
 
   const handleSignupRedirect = (address: string) => {
     setWalletAddress(address);
-    navigate("/signup");
+    navigate('/signup');
   };
 
   const handleSignupComplete = (userData: SignupData) => {
     setWalletAddress(userData.walletAddress);
-    navigate("/dashboard");
+    navigate('/dashboard');
   };
 
   const handleLogout = () => {
-    console.log("User logged out");
-    setWalletAddress("");
-    navigate("/");
+    setWalletAddress('');
+    navigate('/');
   };
 
   return (
@@ -57,7 +56,7 @@ function App() {
                 <Route
                   path="/"
                   element={
-                    <LandingPage onLaunchApp={() => navigate("/login")} />
+                    <LandingPage onLaunchApp={() => navigate('/login')} />
                   }
                 />
                 <Route
@@ -74,7 +73,7 @@ function App() {
                   element={
                     <Signup
                       onSignupComplete={handleSignupComplete}
-                      onBackToLogin={() => navigate("/login")}
+                      onBackToLogin={() => navigate('/login')}
                       connectedWallet={walletAddress}
                     />
                   }
@@ -97,19 +96,19 @@ function App() {
                 <Route
                   path="/landingPage"
                   element={
-                    <LandingPage onLaunchApp={() => navigate("/login")} />
+                    <LandingPage onLaunchApp={() => navigate('/login')} />
                   }
                 />
 
                 <Route
                   path="*"
                   element={
-                    <LandingPage onLaunchApp={() => navigate("/login")} />
+                    <LandingPage onLaunchApp={() => navigate('/login')} />
                   }
                 />
                 <Route
                   path="/meeting"
-                  element={<Meeting onLeave={() => navigate("/")} />}
+                  element={<Meeting onLeave={() => navigate('/')} />}
                 />
               </Routes>
             </ToastProvider>
